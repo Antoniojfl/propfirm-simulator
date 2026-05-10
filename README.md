@@ -1,121 +1,182 @@
-# Prop Firm Account Simulator
+# Prop Firm Simulator
 
-> **Status: PENDING IMPLEMENTATION**
+Simulador para evaluar estrategias de trading contra reglas de prop firms de futuros, con Monte Carlo, optimizer, editor de perfiles y modulo de bankroll/risk of ruin.
 
----
+## Requisitos
 
-## Objective
+- Node.js 20 o superior recomendado.
+- npm.
+- Git, si quieres clonar o contribuir.
 
-Given a list of historical trades from one or more trading strategies (CSV/JSON),
-simulate how those trades would perform against the evaluation rules of major
-prop firm programs.
+## Instalacion
 
-The goal is to answer: **"Would this strategy pass the evaluation — and stay funded?"**
+Clona el repositorio:
 
----
-
-## Planned Features
-
-### Phase 1 — Core Simulation Engine
-
-- Load trade list from CSV (compatible with NinjaTrader, StrategyQuant, MT5 exports)
-- Simulate account balance curve trade by trade
-- Track:
-  - Daily P&L
-  - Cumulative drawdown (from peak equity)
-  - Trailing max drawdown (EOD or intraday)
-  - Win rate, profit factor, average RR
-
-### Phase 2 — Prop Firm Rule Engine
-
-Configurable rules per firm:
-
-| Rule | Description |
-|---|---|
-| `daily_loss_limit` | Max loss allowed in a single trading day |
-| `max_trailing_drawdown` | Maximum drawdown from account peak (trailing or static) |
-| `profit_target` | Required profit to pass evaluation |
-| `min_trading_days` | Minimum number of active trading days |
-| `max_daily_profit_cap` | Some firms cap how much you can make in one day (consistency rule) |
-| `consistency_rule` | No single day > X% of total profit |
-| `news_restriction` | Flag trades within N minutes of major news events |
-| `time_restriction` | Flag trades outside allowed hours |
-| `contract_limit` | Max contracts per trade |
-
-### Phase 3 — Multi-Firm Comparison
-
-Run the same strategy against multiple firm configurations simultaneously
-and output a comparison table:
-
-```
-Strategy: NQ_scalper_v3
-Trades: 847 | Period: 2024-01-01 to 2025-01-01
-
-Firm                  | Pass/Fail | Violations | Max DD Hit | Days to Pass
-----------------------|-----------|------------|------------|-------------
-Apex $50K 1-Step      | PASS      | 0          | 62%        | 14 days
-Apex $50K 2-Step      | PASS      | 0          | 71%        | 8 days
-TopStep $50K          | FAIL      | 2          | 98%        | N/A
-FTMO $100K            | FAIL      | 1          | 89%        | N/A
-MyFundedFutures $50K  | PASS      | 0          | 55%        | 11 days
+```bash
+git clone https://github.com/Antoniojfl/propfirm-simulator.git
+cd propfirm-simulator
 ```
 
-### Phase 4 — Monte Carlo Simulation
+Instala dependencias:
 
-- Generate N random trade sequences from the strategy's distribution
-- Simulate pass/fail probability across scenarios
-- Confidence interval: "This strategy passes X% of the time"
-
----
-
-## Input Format (Planned)
-
-### Trade List CSV
-
-```csv
-date,time,symbol,direction,entry_price,exit_price,contracts,pnl,mae,mfe
-2024-01-15,09:32:00,NQ,BUY,21050.25,21075.50,2,1012.50,-125.00,1350.00
-2024-01-15,10:15:00,NQ,SELL,21082.00,21065.75,1,325.00,-200.00,500.00
+```bash
+npm install
 ```
 
-### Firm Config JSON
+## Levantar el proyecto
 
-```json
-{
-  "firm": "Apex Trader Funding",
-  "account_size": 50000,
-  "profit_target": 3000,
-  "daily_loss_limit": 1000,
-  "max_trailing_drawdown": 2500,
-  "trailing_type": "EOD",
-  "min_trading_days": 7,
-  "consistency_rule": false,
-  "contract_limit": 5
-}
+Inicia el servidor local:
+
+```bash
+npm start
 ```
 
----
+Abre la app en:
 
-## Firms to Model (Initial Set)
+```text
+http://localhost:3000
+```
 
-- **Apex Trader Funding** — 1-step and 2-step programs, trailing EOD DD
-- **TopStep** — 2-step, consistency rule, daily loss limit
-- **FTMO** — 2-step, max daily loss + max overall loss
-- **MyFundedFutures** — 1-step, static DD
-- **Take Profit Trader** — EOD trailing DD
+El servidor Express sirve la UI desde `public/index.html` y expone las APIs bajo `/api`.
 
----
+## Comandos utiles
 
-## Tech Stack (Proposed)
+```bash
+npm start
+```
 
-- **Runtime:** Node.js or Python (TBD based on user preference)
-- **Input:** CSV trade list (NinjaTrader/MT5/SQX export format)
-- **Output:** Console table + optional JSON/CSV report
-- **Config:** JSON per firm (easily extensible)
+Levanta la app local en `http://localhost:3000`.
 
----
+```bash
+npm test
+```
 
-## Source Data
+Ejecuta los tests unitarios del motor de simulacion, optimizer y bankroll.
 
-The user has strategy trade lists from StrategyQuant X backtests.
-Format will be confirmed when implementation begins.
+```bash
+npm run typecheck
+```
+
+Valida tipos TypeScript sin compilar archivos.
+
+## Como usar la app
+
+1. Selecciona un perfil de prop firm y una carpeta de estrategias.
+2. Configura instrumentos y contratos por fase:
+   - Evaluacion
+   - Funded pre payout
+   - Funded post payout
+3. Elige Monte Carlo aleatorio o seed fijo.
+4. Ejecuta la simulacion.
+5. Revisa el ranking de estrategias.
+6. Haz click en una estrategia para ver trazas trade a trade.
+
+## Modulos principales
+
+### Simulacion Monte Carlo
+
+Calcula metricas por estrategia, incluyendo:
+
+- pass rate
+- payout rate
+- expected value
+- funded blow-up
+- max consecutive losses
+- trades/days to pass
+- trazas representativas trade a trade
+
+El modo `seeded` permite reproducir resultados con la misma seed.
+
+### Profile Studio
+
+Permite editar perfiles y reglas por fase:
+
+- `Eval Rules`
+- `Funded Rules`
+- `Payout Rules`
+
+Los perfiles soportan limites separados para:
+
+- `maxMiniContracts`
+- `maxMicroContracts`
+
+### Optimizer
+
+Busca combinaciones de instrumentos, contratos y scaling usando el motor Monte Carlo como dependencia. Devuelve ranking por score ajustado por riesgo.
+
+### Bankroll Risk
+
+Simula el negocio completo usando un bankroll operativo para comprar cuentas:
+
+- risk of ruin
+- stalled rate
+- operating bankroll
+- withdrawn profit
+- total net worth
+- net profit
+- ROI
+- curvas representativas
+- eventos diarios
+
+## Datos de entrada
+
+Las estrategias viven en:
+
+```text
+strategies/
+```
+
+Actualmente se soportan archivos CSV exportados con columnas compatibles con el parser local. Las carpetas disponibles se detectan automaticamente desde `strategies/`.
+
+Los perfiles de prop firms viven en:
+
+```text
+config/prop_firms/
+```
+
+Los defaults oficiales se guardan en:
+
+```text
+config/prop_firms/defaults/
+```
+
+## Estructura del proyecto
+
+```text
+public/
+  index.html              UI principal
+
+src/
+  server.ts               API Express y jobs async
+  simulationEngine.ts     Motor trade a trade por cuenta
+  monteCarloEngine.ts     Monte Carlo por estrategia
+  optimizer/              Modulo optimizer
+  bankroll/               Modulo bankroll/risk of ruin
+  profileStore.ts         Persistencia y validacion de perfiles
+  tradeParser.ts          Parser CSV
+  types.ts                Tipos compartidos
+
+tests/
+  *.test.ts               Tests unitarios
+```
+
+## APIs principales
+
+- `GET /api/profiles`
+- `PUT /api/profiles/:id`
+- `POST /api/profiles/:id/duplicate`
+- `POST /api/profiles/:id/restore`
+- `GET /api/folders`
+- `POST /api/simulate`
+- `POST /api/optimize`
+- `POST /api/bankroll/simulate`
+- `GET /api/jobs/:id`
+- `POST /api/jobs/:id/cancel`
+
+Las corridas largas usan jobs async con progreso y cancelacion.
+
+## Notas
+
+- `node_modules/`, archivos temporales y `.rar` estan excluidos por `.gitignore`.
+- Las reglas como HFT, hedging, news y duracion de trade se asumen cumplidas y no se modelan en v1.
+- La curva principal de bankroll mide cash operativo; la ganancia retirada y total net worth se reportan por separado.
