@@ -363,10 +363,15 @@
     }
 
     .metric {
+      position: relative;
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 0.65rem;
       background: #15181c;
+    }
+
+    .metric[title] {
+      cursor: help;
     }
 
     .metric small {
@@ -395,6 +400,12 @@
       background: #131619;
       overflow: hidden;
       margin-bottom: 1rem;
+    }
+
+    .chart-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 0.6rem;
     }
 
     .strategy-picker {
@@ -793,6 +804,13 @@
         </div>
         <div class="section">
           <div id="bankrollMetrics" class="metric-grid"></div>
+          <div class="chart-toolbar">
+            <select id="bankrollChartMode" onchange="renderBankrollResults()" style="width: 260px;">
+              <option value="bankroll">Bankroll operativo</option>
+              <option value="withdrawnProfit">Ganancia retirada</option>
+              <option value="totalNetWorth">Total net worth</option>
+            </select>
+          </div>
           <div id="bankrollChart" class="chart"></div>
           <div class="results-wrap" style="max-height: 320px;">
             <table>
@@ -1418,8 +1436,8 @@
       `;
     }
 
-    function metric(label, value) {
-      return `<div class="metric"><small>${label}</small><strong>${escapeHtml(value)}</strong></div>`;
+    function metric(label, value, help = '') {
+      return `<div class="metric" ${help ? `title="${escapeHtml(help)}"` : ''}><small>${label}</small><strong>${escapeHtml(value)}</strong></div>`;
     }
 
     function eventBadge(event) {
@@ -1588,22 +1606,26 @@
       document.getElementById('bankrollStatus').textContent = `${data.iterations} iteraciones`;
       document.getElementById('bankrollResultStatus').textContent = `Ruina ${pct(data.riskOfRuinPercent)} / Stalled ${pct(data.stalledPercent)}`;
       document.getElementById('bankrollMetrics').innerHTML = [
-        metric('Risk of ruin', pct(data.riskOfRuinPercent)),
-        metric('Stalled', pct(data.stalledPercent)),
-        metric('Median final', money(data.medianFinalBankroll)),
-        metric('P10 / P90', `${money(data.p10FinalBankroll)} / ${money(data.p90FinalBankroll)}`),
-        metric('Median max DD', money(data.medianMaxDrawdown)),
-        metric('Avg payouts', Number(data.avgPayouts).toFixed(1)),
-        metric('Avg purchased', Number(data.avgAccountsPurchased).toFixed(1)),
-        metric('Avg blown', Number(data.avgAccountsBlown).toFixed(1)),
-        metric('Avg withdrawn', money(data.avgWithdrawnProfit)),
-        metric('Horizon', `${data.horizonDays}d`)
+        metric('Risk of ruin', pct(data.riskOfRuinPercent), 'Porcentaje de simulaciones donde el bankroll operativo llego a cero o menos.'),
+        metric('Stalled', pct(data.stalledPercent), 'Porcentaje de simulaciones donde no hay cuentas activas y el bankroll no alcanza para comprar otra evaluacion.'),
+        metric('Operating bankroll', money(data.medianOperatingBankroll ?? data.medianFinalBankroll), 'Mediana del capital liquido que queda disponible para comprar nuevas cuentas al final del horizonte.'),
+        metric('Withdrawn profit', money(data.medianWithdrawnProfit || 0), 'Mediana de la ganancia acumulada retirada del sistema, segun el porcentaje que decidiste no reinvertir.'),
+        metric('Total net worth', money(data.medianTotalNetWorth || data.medianFinalBankroll), 'Mediana de bankroll operativo mas ganancia retirada. Mide el valor total del sistema.'),
+        metric('Net profit', money(data.medianNetProfit || 0), 'Mediana de ganancia neta contra el bankroll inicial: bankroll operativo final + ganancia retirada - bankroll inicial.'),
+        metric('ROI', pct(data.medianROIPercent || 0), 'Retorno mediano sobre el bankroll inicial usando la ganancia neta.'),
+        metric('P10 / P90 bankroll', `${money(data.p10OperatingBankroll ?? data.p10FinalBankroll)} / ${money(data.p90OperatingBankroll ?? data.p90FinalBankroll)}`, 'Rango de resultados del bankroll operativo final: P10 es escenario malo y P90 escenario bueno.'),
+        metric('Median max DD', money(data.medianMaxDrawdown), 'Mediana de la peor caida del bankroll operativo desde su punto maximo anterior.'),
+        metric('Avg payouts', Number(data.avgPayouts).toFixed(1), 'Cantidad promedio de payouts cobrados por simulacion.'),
+        metric('Avg purchased', Number(data.avgAccountsPurchased).toFixed(1), 'Cantidad promedio de evaluaciones compradas por simulacion.'),
+        metric('Avg blown', Number(data.avgAccountsBlown).toFixed(1), 'Cantidad promedio de cuentas quemadas por simulacion.'),
+        metric('Avg withdrawn', money(data.avgWithdrawnProfit), 'Promedio de dinero retirado fuera del bankroll operativo.'),
+        metric('Horizon', `${data.horizonDays}d`, 'Cantidad de dias operativos simulados; cada mes equivale aproximadamente a 21 dias.')
       ].join('');
-      renderBankrollChart(data.representativeCurves?.[0]?.curve || []);
+      renderBankrollChart(data.representativeCurves?.[0]?.curve || [], document.getElementById('bankrollChartMode').value);
       renderBankrollEvents(data.eventSamples || []);
     }
 
-    function renderBankrollChart(curve) {
+    function renderBankrollChart(curve, mode = 'bankroll') {
       const el = document.getElementById('bankrollChart');
       if (!curve.length) {
         el.innerHTML = '<div class="section muted">Sin curva.</div>';
@@ -1611,7 +1633,12 @@
       }
       const width = 900;
       const height = 240;
-      const values = curve.map(point => point.bankroll);
+      const chartLabels = {
+        bankroll: 'Bankroll operativo',
+        withdrawnProfit: 'Ganancia retirada',
+        totalNetWorth: 'Total net worth'
+      };
+      const values = curve.map(point => Number(point[mode] ?? point.bankroll));
       const min = Math.min(...values);
       const max = Math.max(...values);
       const span = Math.max(1, max - min);
@@ -1623,6 +1650,7 @@
       el.innerHTML = `
         <svg viewBox="0 0 ${width} ${height}" width="100%" height="240" role="img">
           <polyline points="${points}" fill="none" stroke="var(--accent)" stroke-width="3" />
+          <text x="${width - 180}" y="24" fill="var(--muted)" font-size="13">${chartLabels[mode] || chartLabels.bankroll}</text>
           <text x="12" y="24" fill="var(--muted)" font-size="13">${money(max)}</text>
           <text x="12" y="${height - 10}" fill="var(--muted)" font-size="13">${money(min)}</text>
         </svg>

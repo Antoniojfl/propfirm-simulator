@@ -41,22 +41,29 @@ export interface BankrollEvent {
   message: string;
   amount?: number;
   bankrollAfter: number;
+  withdrawnProfitAfter?: number;
+  totalNetWorthAfter?: number;
 }
 
 export interface BankrollCurvePoint {
   day: number;
   bankroll: number;
+  withdrawnProfit: number;
+  totalNetWorth: number;
+  netProfit: number;
   activeAccounts: number;
   accountsPurchased: number;
   accountsBlown: number;
   payoutsTaken: number;
-  withdrawnProfit: number;
 }
 
 export interface BankrollRepresentativeCurve {
   id: string;
   status: 'COMPLETED' | 'RUINED' | 'STALLED';
   finalBankroll: number;
+  finalWithdrawnProfit: number;
+  finalTotalNetWorth: number;
+  finalNetProfit: number;
   maxDrawdown: number;
   curve: BankrollCurvePoint[];
   events: BankrollEvent[];
@@ -65,6 +72,10 @@ export interface BankrollRepresentativeCurve {
 export interface BankrollIterationResult {
   status: 'COMPLETED' | 'RUINED' | 'STALLED';
   finalBankroll: number;
+  finalWithdrawnProfit: number;
+  finalTotalNetWorth: number;
+  finalNetProfit: number;
+  roiPercent: number;
   maxDrawdown: number;
   payoutsTaken: number;
   accountsPurchased: number;
@@ -80,6 +91,13 @@ export interface BankrollResponse {
   riskOfRuinPercent: number;
   stalledPercent: number;
   medianFinalBankroll: number;
+  medianOperatingBankroll: number;
+  p10OperatingBankroll: number;
+  p90OperatingBankroll: number;
+  medianWithdrawnProfit: number;
+  medianTotalNetWorth: number;
+  medianNetProfit: number;
+  medianROIPercent: number;
   p10FinalBankroll: number;
   p90FinalBankroll: number;
   medianMaxDrawdown: number;

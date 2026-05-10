@@ -48,6 +48,10 @@ export class BankrollEngine {
 
   private buildResponse(results: BankrollIterationResult[], iterations: number, horizonDays: number): BankrollResponse {
     const finalBankrolls = results.map(result => result.finalBankroll);
+    const withdrawnProfits = results.map(result => result.finalWithdrawnProfit);
+    const totalNetWorths = results.map(result => result.finalTotalNetWorth);
+    const netProfits = results.map(result => result.finalNetProfit);
+    const roiPercents = results.map(result => result.roiPercent);
     const maxDrawdowns = results.map(result => result.maxDrawdown);
     const ruinCount = results.filter(result => result.status === 'RUINED').length;
     const stalledCount = results.filter(result => result.status === 'STALLED').length;
@@ -58,6 +62,13 @@ export class BankrollEngine {
       riskOfRuinPercent: (ruinCount / iterations) * 100,
       stalledPercent: (stalledCount / iterations) * 100,
       medianFinalBankroll: percentile(finalBankrolls, 0.5),
+      medianOperatingBankroll: percentile(finalBankrolls, 0.5),
+      p10OperatingBankroll: percentile(finalBankrolls, 0.1),
+      p90OperatingBankroll: percentile(finalBankrolls, 0.9),
+      medianWithdrawnProfit: percentile(withdrawnProfits, 0.5),
+      medianTotalNetWorth: percentile(totalNetWorths, 0.5),
+      medianNetProfit: percentile(netProfits, 0.5),
+      medianROIPercent: percentile(roiPercents, 0.5),
       p10FinalBankroll: percentile(finalBankrolls, 0.1),
       p90FinalBankroll: percentile(finalBankrolls, 0.9),
       medianMaxDrawdown: percentile(maxDrawdowns, 0.5),
@@ -69,6 +80,9 @@ export class BankrollEngine {
         id: `curve-${index + 1}`,
         status: result.status,
         finalBankroll: result.finalBankroll,
+        finalWithdrawnProfit: result.finalWithdrawnProfit,
+        finalTotalNetWorth: result.finalTotalNetWorth,
+        finalNetProfit: result.finalNetProfit,
         maxDrawdown: result.maxDrawdown,
         curve: result.curve,
         events: result.events.slice(0, 120)
@@ -104,6 +118,7 @@ export class BankrollEngine {
         accountCost,
         bankrollRef: value => { bankroll = value; },
         getBankroll: () => bankroll,
+        getWithdrawnProfit: () => withdrawnProfit,
         events,
         nextStrategy: () => {
           const strategy = this.input.strategies[strategyCursor % this.input.strategies.length];
@@ -121,9 +136,11 @@ export class BankrollEngine {
           type: 'BANKROLL_RUINED',
           message: 'Bankroll reached zero or below',
           amount: bankroll,
-          bankrollAfter: bankroll
+          bankrollAfter: bankroll,
+          withdrawnProfitAfter: withdrawnProfit,
+          totalNetWorthAfter: bankroll + withdrawnProfit
         });
-        curve.push(this.curvePoint(day, bankroll, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken, withdrawnProfit));
+        curve.push(this.curvePoint(day, bankroll, withdrawnProfit, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken));
         break;
       }
 
@@ -131,7 +148,7 @@ export class BankrollEngine {
         const account = activeAccounts[index];
         const trade = account.trace.trades[account.nextTradeIndex];
         if (!trade) {
-          events.push(this.event(day, account, 'DATA_EXHAUSTED', 'No more trades available for this account', undefined, bankroll));
+          events.push(this.event(day, account, 'DATA_EXHAUSTED', 'No more trades available for this account', undefined, bankroll, withdrawnProfit));
           activeAccounts.splice(index, 1);
           continue;
         }
@@ -143,16 +160,16 @@ export class BankrollEngine {
           bankroll += reinvested;
           withdrawnProfit += payout - reinvested;
           payoutsTaken++;
-          events.push(this.event(day, account, 'PAYOUT_TAKEN', `Payout reinvested ${this.money(reinvested)}`, reinvested, bankroll));
+          events.push(this.event(day, account, 'PAYOUT_TAKEN', `Payout reinvested ${this.money(reinvested)}`, reinvested, bankroll, withdrawnProfit));
         }
 
         if (trade.events.some(event => event.type === 'EVAL_PASSED')) {
-          events.push(this.event(day, account, 'EVAL_PASSED', 'Evaluation passed', undefined, bankroll));
+          events.push(this.event(day, account, 'EVAL_PASSED', 'Evaluation passed', undefined, bankroll, withdrawnProfit));
         }
 
         if (trade.events.some(event => event.type === 'ACCOUNT_BLOWN')) {
           accountsBlown++;
-          events.push(this.event(day, account, 'ACCOUNT_BLOWN', 'Account blown', undefined, bankroll));
+          events.push(this.event(day, account, 'ACCOUNT_BLOWN', 'Account blown', undefined, bankroll, withdrawnProfit));
           activeAccounts.splice(index, 1);
         } else if (account.nextTradeIndex >= account.trace.trades.length && account.trace.status === 'GRADUATED') {
           activeAccounts.splice(index, 1);
@@ -168,18 +185,29 @@ export class BankrollEngine {
           day,
           type: status === 'RUINED' ? 'BANKROLL_RUINED' : 'STALLED',
           message: status === 'RUINED' ? 'Bankroll reached zero or below' : 'No active accounts and not enough bankroll to buy another evaluation',
-          bankrollAfter: bankroll
+          bankrollAfter: bankroll,
+          withdrawnProfitAfter: withdrawnProfit,
+          totalNetWorthAfter: bankroll + withdrawnProfit
         });
-        curve.push(this.curvePoint(day, bankroll, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken, withdrawnProfit));
+        curve.push(this.curvePoint(day, bankroll, withdrawnProfit, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken));
         break;
       }
 
-      curve.push(this.curvePoint(day, bankroll, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken, withdrawnProfit));
+      curve.push(this.curvePoint(day, bankroll, withdrawnProfit, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken));
     }
+
+    const finalTotalNetWorth = bankroll + withdrawnProfit;
+    const initialBankroll = Number(request.initialBankroll || 0);
+    const finalNetProfit = finalTotalNetWorth - initialBankroll;
+    const roiPercent = initialBankroll > 0 ? (finalNetProfit / initialBankroll) * 100 : 0;
 
     return {
       status,
       finalBankroll: bankroll,
+      finalWithdrawnProfit: withdrawnProfit,
+      finalTotalNetWorth,
+      finalNetProfit,
+      roiPercent,
       maxDrawdown,
       payoutsTaken,
       accountsPurchased,
@@ -197,6 +225,7 @@ export class BankrollEngine {
     accountCost: number;
     bankrollRef: (value: number) => void;
     getBankroll: () => number;
+    getWithdrawnProfit: () => number;
     events: BankrollEvent[];
     nextStrategy: () => { strategy: string; trades: any[] };
     accountIndex: () => number;
@@ -220,6 +249,7 @@ export class BankrollEngine {
         }
       });
       input.activeAccounts.push(lifecycle);
+      const withdrawnProfit = input.getWithdrawnProfit();
       input.events.push({
         day: input.day,
         accountId,
@@ -227,7 +257,9 @@ export class BankrollEngine {
         type: 'ACCOUNT_PURCHASED',
         message: `Purchased evaluation for ${strategy.strategy}`,
         amount: -input.accountCost,
-        bankrollAfter: bankrollAfterPurchase
+        bankrollAfter: bankrollAfterPurchase,
+        withdrawnProfitAfter: withdrawnProfit,
+        totalNetWorthAfter: bankrollAfterPurchase + withdrawnProfit
       });
     }
   }
@@ -238,7 +270,7 @@ export class BankrollEngine {
       .reduce((sum, event) => sum + Number(event.value || 0), 0);
   }
 
-  private event(day: number, account: AccountLifecycle, type: BankrollEvent['type'], message: string, amount: number | undefined, bankroll: number): BankrollEvent {
+  private event(day: number, account: AccountLifecycle, type: BankrollEvent['type'], message: string, amount: number | undefined, bankroll: number, withdrawnProfit: number): BankrollEvent {
     return {
       day,
       accountId: account.accountId,
@@ -246,27 +278,33 @@ export class BankrollEngine {
       type,
       message,
       amount,
-      bankrollAfter: bankroll
+      bankrollAfter: bankroll,
+      withdrawnProfitAfter: withdrawnProfit,
+      totalNetWorthAfter: bankroll + withdrawnProfit
     };
   }
 
   private curvePoint(
     day: number,
     bankroll: number,
+    withdrawnProfit: number,
     activeAccounts: number,
     accountsPurchased: number,
     accountsBlown: number,
-    payoutsTaken: number,
-    withdrawnProfit: number
+    payoutsTaken: number
   ) {
+    const initialBankroll = Number(this.input.request.initialBankroll || 0);
+    const totalNetWorth = bankroll + withdrawnProfit;
     return {
       day,
       bankroll,
+      withdrawnProfit,
+      totalNetWorth,
+      netProfit: totalNetWorth - initialBankroll,
       activeAccounts,
       accountsPurchased,
       accountsBlown,
-      payoutsTaken,
-      withdrawnProfit
+      payoutsTaken
     };
   }
 
