@@ -1,0 +1,110 @@
+{
+  "firm_name": "Tradeify Select Flex 50K",
+  "display_name": "Tradeify Select Flex 50K",
+  "account_size": 50000,
+  "cost": 80,
+  "version": 1,
+  "official": true,
+  "evalRules": {
+    "maxContracts": 4,
+    "profitTarget": {
+      "enabled": true,
+      "amount": 3000
+    },
+    "drawdown": {
+      "enabled": true,
+      "mode": "EOD",
+      "amount": 2000,
+      "lockAtBalance": 50100
+    },
+    "consistency": {
+      "enabled": true,
+      "maxDailyProfitPercent": 0.4
+    },
+    "minTradingDays": {
+      "enabled": true,
+      "days": 3
+    },
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news"
+    ],
+    "maxMiniContracts": 4,
+    "maxMicroContracts": 40
+  },
+  "fundedRules": {
+    "maxContracts": 4,
+    "drawdown": {
+      "enabled": true,
+      "mode": "EOD",
+      "amount": 2000,
+      "lockAtBalance": 50100
+    },
+    "consistency": {
+      "enabled": false,
+      "maxDailyProfitPercent": 0
+    },
+    "minTradingDays": {
+      "enabled": false,
+      "days": 0
+    },
+    "scaling": {
+      "enabled": true,
+      "updateTiming": "EOD",
+      "allowDecrease": false,
+      "tiers": [
+        {
+          "profitFrom": 0,
+          "contracts": 2
+        },
+        {
+          "profitFrom": 1500,
+          "contracts": 3
+        },
+        {
+          "profitFrom": 2000,
+          "contracts": 4
+        }
+      ]
+    },
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news"
+    ],
+    "maxMiniContracts": 4,
+    "maxMicroContracts": 40
+  },
+  "payoutRules": {
+    "enabled": true,
+    "minTradingDays": 5,
+    "minProfitPerDay": 1,
+    "minPayoutAmount": 1,
+    "maxPayoutAmount": 3000,
+    "payoutPercent": 0.5,
+    "payoutSplit": 0.9,
+    "positiveCycleProfitRequired": true,
+    "deductPayout": true,
+    "resetCycleAfterPayout": true,
+    "consistency": {
+      "enabled": false,
+      "maxDailyProfitPercent": 0
+    }
+  },
+  "metadata": {
+    "product": "Select Flex",
+    "sourceUrls": [
+      "https://help.tradeify.co/en/articles/12853921-select-evaluation-accounts",
+      "https://help.tradeify.co/en/articles/12853966-select-flex-and-select-daily-payout-policies"
+    ],
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news"
+    ]
+  }
+}

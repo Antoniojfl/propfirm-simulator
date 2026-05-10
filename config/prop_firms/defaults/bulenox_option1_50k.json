@@ -1,0 +1,93 @@
+{
+  "firm_name": "Bulenox Option 1 50K",
+  "display_name": "Bulenox Option 1 50K",
+  "account_size": 50000,
+  "cost": 175,
+  "version": 1,
+  "official": true,
+  "evalRules": {
+    "maxContracts": 7,
+    "profitTarget": {
+      "enabled": true,
+      "amount": 3000
+    },
+    "drawdown": {
+      "enabled": true,
+      "mode": "INTRADAY",
+      "amount": 2500
+    },
+    "consistency": {
+      "enabled": false,
+      "maxDailyProfitPercent": 0
+    },
+    "minTradingDays": {
+      "enabled": true,
+      "days": 1
+    },
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news"
+    ],
+    "maxMiniContracts": 7,
+    "maxMicroContracts": 70
+  },
+  "fundedRules": {
+    "maxContracts": 7,
+    "drawdown": {
+      "enabled": true,
+      "mode": "INTRADAY",
+      "amount": 2500,
+      "lockAtBalance": 50100
+    },
+    "consistency": {
+      "enabled": false,
+      "maxDailyProfitPercent": 0
+    },
+    "minTradingDays": {
+      "enabled": false,
+      "days": 0
+    },
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news"
+    ],
+    "maxMiniContracts": 7,
+    "maxMicroContracts": 70
+  },
+  "payoutRules": {
+    "enabled": true,
+    "minTradingDays": 10,
+    "minPayoutAmount": 1000,
+    "payoutCaps": [
+      1500,
+      1500,
+      1500
+    ],
+    "payoutSplit": 1,
+    "safetyNetBalance": 52600,
+    "positiveCycleProfitRequired": true,
+    "deductPayout": true,
+    "resetCycleAfterPayout": true,
+    "consistency": {
+      "enabled": true,
+      "maxDailyProfitPercent": 0.4
+    }
+  },
+  "metadata": {
+    "product": "Option 1 No Scaling",
+    "sourceUrls": [
+      "https://bulenox.com/help/qualification-account/",
+      "https://bulenox.com/help/master-account/"
+    ],
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news"
+    ]
+  }
+}

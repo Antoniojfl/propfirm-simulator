@@ -1,0 +1,101 @@
+{
+  "firm_name": "Apex Intraday 50K",
+  "display_name": "Apex Intraday 50K",
+  "account_size": 50000,
+  "cost": 80,
+  "version": 1,
+  "official": true,
+  "evalRules": {
+    "maxContracts": 6,
+    "profitTarget": {
+      "enabled": true,
+      "amount": 3000
+    },
+    "drawdown": {
+      "enabled": true,
+      "mode": "INTRADAY",
+      "amount": 2000
+    },
+    "consistency": {
+      "enabled": false,
+      "maxDailyProfitPercent": 0
+    },
+    "minTradingDays": {
+      "enabled": false,
+      "days": 0
+    },
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news",
+      "funded_daily_loss_limit"
+    ],
+    "maxMiniContracts": 6,
+    "maxMicroContracts": 60
+  },
+  "fundedRules": {
+    "maxContracts": 4,
+    "drawdown": {
+      "enabled": true,
+      "mode": "INTRADAY",
+      "amount": 2000,
+      "lockAtBalance": 50100
+    },
+    "consistency": {
+      "enabled": false,
+      "maxDailyProfitPercent": 0
+    },
+    "minTradingDays": {
+      "enabled": false,
+      "days": 0
+    },
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news",
+      "funded_daily_loss_limit"
+    ],
+    "maxMiniContracts": 4,
+    "maxMicroContracts": 40
+  },
+  "payoutRules": {
+    "enabled": true,
+    "minTradingDays": 5,
+    "minProfitPerDay": 200,
+    "minPayoutAmount": 500,
+    "payoutCaps": [
+      1500,
+      2000,
+      2500,
+      2500,
+      3000,
+      3000
+    ],
+    "payoutSplit": 1,
+    "maxPayouts": 6,
+    "safetyNetBalance": 52600,
+    "positiveCycleProfitRequired": true,
+    "deductPayout": true,
+    "resetCycleAfterPayout": true,
+    "consistency": {
+      "enabled": true,
+      "maxDailyProfitPercent": 0.5
+    }
+  },
+  "metadata": {
+    "product": "Intraday Trailing",
+    "sourceUrls": [
+      "https://apextraderfunding.com/help-center/evaluation-accounts-ea/intraday-trailing-drawdown-evaluations/",
+      "https://apextraderfunding.com/help-center/intraday-trailing-drawdown-accounts/intraday-trailing-drawdown-payouts/"
+    ],
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news",
+      "funded_daily_loss_limit"
+    ]
+  }
+}

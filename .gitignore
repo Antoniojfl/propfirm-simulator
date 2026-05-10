@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.cache/
+.env
+.env.*
+*.log
+*.tmp
+*.rar
+scratch.ts
+test-points.js
+New folder/

@@ -1,0 +1,113 @@
+{
+  "firm_name": "LucidFlex 50K",
+  "display_name": "LucidFlex 50K",
+  "account_size": 50000,
+  "cost": 84,
+  "version": 1,
+  "official": true,
+  "evalRules": {
+    "maxContracts": 4,
+    "profitTarget": {
+      "enabled": true,
+      "amount": 3000
+    },
+    "drawdown": {
+      "enabled": true,
+      "mode": "EOD",
+      "amount": 2000,
+      "lockAtBalance": 50100
+    },
+    "consistency": {
+      "enabled": true,
+      "maxDailyProfitPercent": 0.5
+    },
+    "minTradingDays": {
+      "enabled": false,
+      "days": 0
+    },
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news"
+    ],
+    "maxMiniContracts": 4,
+    "maxMicroContracts": 40
+  },
+  "fundedRules": {
+    "maxContracts": 4,
+    "drawdown": {
+      "enabled": true,
+      "mode": "EOD",
+      "amount": 2000,
+      "lockAtBalance": 50100,
+      "lockOnPayout": true
+    },
+    "consistency": {
+      "enabled": false,
+      "maxDailyProfitPercent": 0
+    },
+    "minTradingDays": {
+      "enabled": false,
+      "days": 0
+    },
+    "scaling": {
+      "enabled": true,
+      "updateTiming": "EOD",
+      "allowDecrease": true,
+      "tiers": [
+        {
+          "profitFrom": 0,
+          "contracts": 2
+        },
+        {
+          "profitFrom": 1000,
+          "contracts": 3
+        },
+        {
+          "profitFrom": 2000,
+          "contracts": 4
+        }
+      ]
+    },
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news"
+    ],
+    "maxMiniContracts": 4,
+    "maxMicroContracts": 40
+  },
+  "payoutRules": {
+    "enabled": true,
+    "minTradingDays": 5,
+    "minProfitPerDay": 150,
+    "minPayoutAmount": 500,
+    "maxPayoutAmount": 2000,
+    "payoutPercent": 0.5,
+    "payoutSplit": 0.9,
+    "maxPayouts": 5,
+    "positiveCycleProfitRequired": true,
+    "deductPayout": true,
+    "resetCycleAfterPayout": true,
+    "lockDrawdownOnPayout": true,
+    "consistency": {
+      "enabled": false,
+      "maxDailyProfitPercent": 0
+    }
+  },
+  "metadata": {
+    "product": "LucidFlex",
+    "sourceUrls": [
+      "https://support.lucidtrading.com/en/articles/12945790-lucidflex-evaluation-account",
+      "https://support.lucidtrading.com/en/articles/12945796-lucidflex-payouts"
+    ],
+    "ignoredRules": [
+      "microscalping",
+      "hft",
+      "hedging",
+      "news"
+    ]
+  }
+}

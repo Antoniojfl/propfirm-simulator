@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prop Firm Simulator</title>
+  <style>
+    :root {
+      --bg: #111315;
+      --surface: #181b1f;
+      --surface-2: #20242a;
+      --line: #30363d;
+      --text: #f1f5f2;
+      --muted: #9aa5a1;
+      --accent: #4fb3a4;
+      --accent-2: #d7a84f;
+      --danger: #ef6b67;
+      --success: #65c58f;
+      --warn: #d7a84f;
+      --input: #0f1113;
+      --shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+    }
+
+    button, input, select, textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid transparent;
+      background: var(--accent);
+      color: #071412;
+      border-radius: 7px;
+      padding: 0.68rem 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--line);
+    }
+
+    button.danger {
+      background: var(--danger);
+      color: #170605;
+      border-color: var(--danger);
+    }
+
+    button.ghost {
+      background: transparent;
+      color: var(--muted);
+      border-color: transparent;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      background: var(--input);
+      color: var(--text);
+      border-radius: 7px;
+      padding: 0.55rem 0.65rem;
+      outline: none;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--accent);
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--line);
+      background: #151719;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    .main {
+      min-width: 0;
+      padding: 1rem;
+      overflow: hidden;
+    }
+
+    .brand {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      letter-spacing: 0;
+    }
+
+    .brand span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 0.25rem;
+    }
+
+    .tabs, .trace-tabs {
+      display: flex;
+      gap: 0.35rem;
+      margin-bottom: 1rem;
+    }
+
+    .tab {
+      background: var(--surface-2);
+      color: var(--muted);
+      border-color: var(--line);
+      padding: 0.55rem 0.7rem;
+    }
+
+    .tab.active {
+      background: var(--accent);
+      color: #071412;
+      border-color: var(--accent);
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-title {
+      font-weight: 800;
+    }
+
+    .section {
+      padding: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .rule-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .rule-row:first-child {
+      border-top: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      border-radius: 999px;
+      padding: 0.12rem 0.5rem;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .badge.good { color: #06120c; background: var(--success); border-color: var(--success); }
+    .badge.bad { color: #170605; background: var(--danger); border-color: var(--danger); }
+    .badge.warn { color: #171004; background: var(--warn); border-color: var(--warn); }
+    .badge.phase { color: var(--text); background: #293039; }
+
+    .results-wrap {
+      overflow: auto;
+      max-height: calc(100vh - 162px);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 0.68rem 0.75rem;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #1b1f24;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    tbody tr {
+      cursor: pointer;
+    }
+
+    tbody tr:hover {
+      background: rgba(79, 179, 164, 0.07);
+    }
+
+    .positive { color: var(--success); font-weight: 800; }
+    .negative { color: var(--danger); font-weight: 800; }
+    .muted { color: var(--muted); }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .loading {
+      display: none;
+      padding: 1rem;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+
+    .progress-box {
+      display: none;
+      margin-top: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #14171a;
+      padding: 0.75rem;
+    }
+
+    .progress-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 0.55rem;
+    }
+
+    .progress-track {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--input);
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.18s ease;
+    }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(980px, 92vw);
+      height: 100vh;
+      background: var(--surface);
+      border-left: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      transform: translateX(105%);
+      transition: transform 0.18s ease;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-body {
+      overflow: auto;
+      padding: 1rem;
+    }
+
+    .trace-summary {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.65rem;
+      background: #15181c;
+    }
+
+    .metric small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 0.2rem;
+    }
+
+    .metric strong {
+      font-size: 1rem;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+
+    .chart {
+      width: 100%;
+      min-height: 240px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #131619;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+
+    .strategy-picker {
+      display: grid;
+      gap: 0.45rem;
+      max-height: 180px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.6rem;
+      background: var(--input);
+    }
+
+    .strategy-option {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.45rem;
+      align-items: center;
+      color: var(--text);
+      font-size: 12px;
+      margin: 0;
+    }
+
+    .events {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 1100px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        max-height: none;
+      }
+      .trace-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div>
+          <h1>Prop Simulator</h1>
+          <span id="runMeta">Ready</span>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" id="simTab" onclick="showLeftTab('sim')">Simulacion</button>
+        <button class="tab" id="optimizerTab" onclick="showLeftTab('optimizer')">Optimizer</button>
+        <button class="tab" id="bankrollTab" onclick="showLeftTab('bankroll')">Bankroll</button>
+        <button class="tab" id="profileTab" onclick="showLeftTab('profile')">Profile Studio</button>
+      </div>
+
+      <section id="simPanel" class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Run Setup</div>
+        </div>
+        <div class="section">
+          <div class="grid">
+            <div class="field full">
+              <label for="profileSelect">Perfil</label>
+              <select id="profileSelect"></select>
+            </div>
+            <div class="field full">
+              <label for="folderSelect">Carpeta</label>
+              <select id="folderSelect"></select>
+            </div>
+            <div class="field">
+              <label for="evalInstrument">Instrumento Eval</label>
+              <select id="evalInstrument">
+                <option value="NQ">NQ</option>
+                <option value="MNQ">MNQ</option>
+                <option value="ES">ES</option>
+                <option value="MES">MES</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fundedPreInstrument">Instrumento Funded Pre</label>
+              <select id="fundedPreInstrument">
+                <option value="NQ">NQ</option>
+                <option value="MNQ">MNQ</option>
+                <option value="ES">ES</option>
+                <option value="MES">MES</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fundedPostInstrument">Instrumento Funded Post</label>
+              <select id="fundedPostInstrument">
+                <option value="NQ">NQ</option>
+                <option value="MNQ">MNQ</option>
+                <option value="ES">ES</option>
+                <option value="MES">MES</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="commissions">Friccion</label>
+              <input id="commissions" type="number" value="4" step="0.5">
+            </div>
+            <div class="field">
+              <label for="evalContracts">Lotes Eval</label>
+              <input id="evalContracts" type="number" value="2" min="0" step="1">
+            </div>
+            <div class="field">
+              <label for="preContracts">Lotes Funded Pre</label>
+              <input id="preContracts" type="number" value="2" min="0" step="1">
+            </div>
+            <div class="field">
+              <label for="postContracts">Lotes Funded Post</label>
+              <input id="postContracts" type="number" value="1" min="0" step="1">
+            </div>
+            <div class="field">
+              <label for="randomMode">Monte Carlo</label>
+              <select id="randomMode" onchange="toggleSeedInput()">
+                <option value="random">Aleatorio</option>
+                <option value="seeded">Seed fijo</option>
+              </select>
+            </div>
+            <div class="field full hidden" id="seedField">
+              <label for="seedInput">Seed</label>
+              <input id="seedInput" value="lucid-lot1-v1">
+            </div>
+          </div>
+
+          <div class="rule-row">
+            <div>
+              <strong>Smart Scaling</strong>
+              <div class="status">Eval de-risk cerca del target</div>
+            </div>
+            <input id="smartScaling" type="checkbox" checked>
+          </div>
+
+          <div class="toolbar" style="margin-top: 1rem;">
+            <button id="runBtn" onclick="runSimulation()">Ejecutar</button>
+            <button id="cancelSimBtn" class="danger hidden" onclick="cancelCurrentJob('simulation')">Cancelar</button>
+            <button class="secondary" onclick="clearResults()">Limpiar</button>
+          </div>
+          <div id="simProgressBox" class="progress-box">
+            <div class="progress-head">
+              <span id="simProgressMessage">Preparando...</span>
+              <strong id="simProgressPercent">0%</strong>
+            </div>
+            <div class="progress-track"><div id="simProgressFill" class="progress-fill"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="optimizerPanel" class="panel hidden">
+        <div class="panel-header">
+          <div class="panel-title">Optimizer</div>
+          <span id="optimizerStatus" class="status">EV ajustado por riesgo</span>
+        </div>
+        <div class="section">
+          <div class="grid">
+            <div class="field">
+              <label for="optimizerIterations">Iteraciones</label>
+              <select id="optimizerIterations">
+                <option value="1000">1000</option>
+                <option value="5000">5000</option>
+                <option value="10000">10000</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="optimizerSeed">Seed</label>
+              <input id="optimizerSeed" value="optimizer-v1">
+            </div>
+            <div class="field">
+              <label for="optimizerStrategy">Estrategia</label>
+              <input id="optimizerStrategy" placeholder="Opcional: Strategy 1.1.735.csv">
+            </div>
+            <div class="field">
+              <label for="optimizerMaxCandidates">Max candidatos</label>
+              <input id="optimizerMaxCandidates" type="number" value="60" min="1" max="250">
+            </div>
+          </div>
+          <div class="grid three" style="margin-top: 0.75rem;">
+            <div class="field">
+              <label>Eval contracts</label>
+              <input id="optEvalRange" value="1-4">
+            </div>
+            <div class="field">
+              <label>Funded Pre contracts</label>
+              <input id="optPreRange" value="1-4">
+            </div>
+            <div class="field">
+              <label>Funded Post contracts</label>
+              <input id="optPostRange" value="1-4">
+            </div>
+          </div>
+          <div class="rule-row">
+            <div>
+              <strong>Instrumentos</strong>
+              <div class="status">Optimizer v1 prueba NQ y MNQ por fase</div>
+            </div>
+            <span class="badge phase">NQ / MNQ</span>
+          </div>
+          <div class="toolbar" style="margin-top: 1rem;">
+            <button id="optimizeBtn" onclick="runOptimizer()">Optimizar</button>
+            <button id="cancelOptimizerBtn" class="danger hidden" onclick="cancelCurrentJob('optimizer')">Cancelar</button>
+          </div>
+          <div id="optimizerProgressBox" class="progress-box">
+            <div class="progress-head">
+              <span id="optimizerProgressMessage">Preparando...</span>
+              <strong id="optimizerProgressPercent">0%</strong>
+            </div>
+            <div class="progress-track"><div id="optimizerProgressFill" class="progress-fill"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="bankrollPanel" class="panel hidden">
+        <div class="panel-header">
+          <div class="panel-title">Bankroll</div>
+          <span id="bankrollStatus" class="status">Risk of ruin</span>
+        </div>
+        <div class="section">
+          <div class="grid">
+            <div class="field">
+              <label for="initialBankroll">Bankroll inicial</label>
+              <input id="initialBankroll" type="number" value="1000" min="0" step="50">
+            </div>
+            <div class="field">
+              <label for="maxActiveAccounts">Cuentas activas/dia</label>
+              <input id="maxActiveAccounts" type="number" value="3" min="1" step="1">
+            </div>
+            <div class="field">
+              <label for="bankrollMonths">Horizonte meses</label>
+              <input id="bankrollMonths" type="number" value="12" min="1" step="1">
+            </div>
+            <div class="field">
+              <label for="bankrollIterations">Iteraciones</label>
+              <select id="bankrollIterations">
+                <option value="250">250</option>
+                <option value="1000" selected>1000</option>
+                <option value="5000">5000</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="reinvestmentPercent">Reinversion %</label>
+              <input id="reinvestmentPercent" type="number" value="100" min="0" max="100" step="5">
+            </div>
+            <div class="field">
+              <label for="bankrollRandomMode">Randomizacion</label>
+              <select id="bankrollRandomMode">
+                <option value="seeded">Seed fijo</option>
+                <option value="random">Aleatorio</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="bankrollSeed">Seed</label>
+              <input id="bankrollSeed" value="bankroll-v1">
+            </div>
+            <div class="field full">
+              <label>Estrategias del ultimo sim</label>
+              <div id="bankrollStrategies" class="strategy-picker">
+                <span class="muted">Primero ejecuta el simulador.</span>
+              </div>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top: 1rem;">
+            <button id="bankrollBtn" onclick="runBankroll()">Simular bankroll</button>
+            <button id="cancelBankrollBtn" class="danger hidden" onclick="cancelCurrentJob('bankroll')">Cancelar</button>
+          </div>
+          <div id="bankrollProgressBox" class="progress-box">
+            <div class="progress-head">
+              <span id="bankrollProgressMessage">Preparando...</span>
+              <strong id="bankrollProgressPercent">0%</strong>
+            </div>
+            <div class="progress-track"><div id="bankrollProgressFill" class="progress-fill"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="profilePanel" class="panel hidden">
+        <div class="panel-header">
+          <div class="panel-title">Profile Studio</div>
+          <span id="profileStatus" class="status">Idle</span>
+        </div>
+        <div class="section">
+          <div class="grid">
+            <div class="field full">
+              <label for="profileName">Nombre</label>
+              <input id="profileName">
+            </div>
+            <div class="field">
+              <label for="profileCost">Costo</label>
+              <input id="profileCost" type="number" min="0" step="1">
+            </div>
+            <div class="field">
+              <label for="profileAccountSize">Cuenta</label>
+              <input id="profileAccountSize" type="number" min="1" step="1000">
+            </div>
+          </div>
+          <div class="tabs" style="margin-top: 1rem;">
+            <button class="tab active" id="evalRulesTab" onclick="showRuleTab('eval')">Eval Rules</button>
+            <button class="tab" id="fundedRulesTab" onclick="showRuleTab('funded')">Funded Rules</button>
+            <button class="tab" id="payoutRulesTab" onclick="showRuleTab('payout')">Payout Rules</button>
+          </div>
+          <div id="profileEditor"></div>
+          <div class="toolbar" style="margin-top: 1rem;">
+            <button onclick="saveProfile()">Guardar perfil</button>
+            <button class="secondary" onclick="duplicateProfile()">Duplicar perfil</button>
+            <button class="secondary" onclick="restoreProfile()">Restaurar oficiales</button>
+            <button class="ghost" onclick="validateProfile()">Validar reglas</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <main class="main">
+      <div class="split">
+        <div>
+          <div class="panel-title">Strategy Ranking</div>
+          <div class="status" id="resultsStatus">Sin resultados</div>
+        </div>
+        <div class="toolbar">
+          <input id="filterInput" placeholder="Filtrar estrategia" oninput="renderResults()" style="width: 220px;">
+          <span class="badge phase" id="seedBadge">random</span>
+          <span class="badge phase" id="instrumentBadge">Eval NQ / Funded NQ</span>
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="results-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Estrategia</th>
+                <th>WR</th>
+                <th>Net/Trade</th>
+                <th>Eval P/F</th>
+                <th>Eval W/L</th>
+                <th>Pass</th>
+                <th>Funded Trades</th>
+                <th>Funded W/L</th>
+                <th>Payout</th>
+                <th>Avg #</th>
+                <th>Avg Payout</th>
+                <th>Max</th>
+                <th>EV</th>
+                <th>MCL</th>
+                <th>Life</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody">
+              <tr><td colspan="15" class="muted">Ejecuta una simulacion para ver resultados.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="loading" class="loading">Procesando simulaciones...</div>
+      </section>
+
+      <section class="panel" style="margin-top: 1rem;">
+        <div class="panel-header">
+          <div class="panel-title">Optimizer Ranking</div>
+          <span id="optimizerResultStatus" class="status">Sin optimizacion</span>
+        </div>
+        <div class="results-wrap" style="max-height: 360px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Badge</th>
+                <th>Estrategia</th>
+                <th>Combinacion</th>
+                <th>Score</th>
+                <th>EV</th>
+                <th>Pass</th>
+                <th>Payout</th>
+                <th>Blow-up</th>
+                <th>Days</th>
+                <th>MCL</th>
+              </tr>
+            </thead>
+            <tbody id="optimizerBody">
+              <tr><td colspan="10" class="muted">Ejecuta el optimizer para ver combinaciones.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top: 1rem;">
+        <div class="panel-header">
+          <div class="panel-title">Bankroll Risk</div>
+          <span id="bankrollResultStatus" class="status">Sin simulacion bankroll</span>
+        </div>
+        <div class="section">
+          <div id="bankrollMetrics" class="metric-grid"></div>
+          <div id="bankrollChart" class="chart"></div>
+          <div class="results-wrap" style="max-height: 320px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Dia</th>
+                  <th>Evento</th>
+                  <th>Estrategia</th>
+                  <th>Cuenta</th>
+                  <th>Monto</th>
+                  <th>Bankroll</th>
+                </tr>
+              </thead>
+              <tbody id="bankrollEventsBody">
+                <tr><td colspan="6" class="muted">Ejecuta bankroll para ver eventos.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <aside class="drawer" id="traceDrawer">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title" id="traceTitle">Trace</div>
+        <div class="status" id="traceStatus">Idle</div>
+      </div>
+      <button class="secondary" onclick="closeTraceDrawer()">Cerrar</button>
+    </div>
+    <div class="drawer-body">
+      <div class="trace-tabs" id="traceTabs"></div>
+      <div id="traceContent"></div>
+    </div>
+  </aside>
+
+  <script>
+    const state = {
+      profiles: [],
+      folders: [],
+      currentProfileId: null,
+      currentProfile: null,
+      currentRuleTab: 'eval',
+      results: [],
+      simulationId: null,
+      randomization: null,
+      optimizerResults: [],
+      bankrollResults: null,
+      currentJobs: {
+        simulation: null,
+        optimizer: null,
+        bankroll: null
+      },
+      activeTraceIndex: 0,
+      traces: []
+    };
+
+    function money(value) {
+      const n = Number(value || 0);
+      return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    }
+
+    function pct(value) {
+      return `${Number(value || 0).toFixed(1)}%`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      }[char]));
+    }
+
+    async function init() {
+      const [profilesRes, foldersRes] = await Promise.all([
+        fetch('/api/profiles'),
+        fetch('/api/folders')
+      ]);
+      state.profiles = await profilesRes.json();
+      state.folders = await foldersRes.json();
+      renderProfileSelect();
+      renderFolderSelect();
+      selectProfile(state.profiles[0]?.id);
+      toggleSeedInput();
+    }
+
+    function renderProfileSelect() {
+      const select = document.getElementById('profileSelect');
+      select.innerHTML = state.profiles.map(item => {
+        const mode = item.profile.evalRules.drawdown.mode;
+        return `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} (${mode})</option>`;
+      }).join('');
+      select.onchange = () => selectProfile(select.value);
+    }
+
+    function renderFolderSelect() {
+      const select = document.getElementById('folderSelect');
+      select.innerHTML = state.folders.map(folder => {
+        const label = folder === '/' ? '/strategies' : folder;
+        return `<option value="${escapeHtml(folder)}">${escapeHtml(label)}</option>`;
+      }).join('');
+    }
+
+    function selectProfile(id) {
+      if (!id) return;
+      state.currentProfileId = id;
+      document.getElementById('profileSelect').value = id;
+      const item = state.profiles.find(profile => profile.id === id);
+      state.currentProfile = structuredClone(item.profile);
+      renderProfileEditor();
+    }
+
+    function showLeftTab(tab) {
+      document.getElementById('simPanel').classList.toggle('hidden', tab !== 'sim');
+      document.getElementById('optimizerPanel').classList.toggle('hidden', tab !== 'optimizer');
+      document.getElementById('bankrollPanel').classList.toggle('hidden', tab !== 'bankroll');
+      document.getElementById('profilePanel').classList.toggle('hidden', tab !== 'profile');
+      document.getElementById('simTab').classList.toggle('active', tab === 'sim');
+      document.getElementById('optimizerTab').classList.toggle('active', tab === 'optimizer');
+      document.getElementById('bankrollTab').classList.toggle('active', tab === 'bankroll');
+      document.getElementById('profileTab').classList.toggle('active', tab === 'profile');
+    }
+
+    function showRuleTab(tab) {
+      state.currentRuleTab = tab;
+      document.getElementById('evalRulesTab').classList.toggle('active', tab === 'eval');
+      document.getElementById('fundedRulesTab').classList.toggle('active', tab === 'funded');
+      document.getElementById('payoutRulesTab').classList.toggle('active', tab === 'payout');
+      renderProfileEditor();
+    }
+
+    function renderProfileEditor() {
+      const profile = state.currentProfile;
+      if (!profile) return;
+      document.getElementById('profileName').value = profile.firm_name;
+      document.getElementById('profileCost').value = profile.cost;
+      document.getElementById('profileAccountSize').value = profile.account_size;
+
+      if (state.currentRuleTab === 'payout') {
+        renderPayoutEditor(profile.payoutRules);
+      } else {
+        const phase = state.currentRuleTab === 'eval' ? 'evalRules' : 'fundedRules';
+        renderPhaseEditor(profile[phase], phase);
+      }
+    }
+
+    function renderPhaseEditor(rules, phase) {
+      const isEval = phase === 'evalRules';
+      document.getElementById('profileEditor').innerHTML = `
+        <div class="grid">
+          <div class="field">
+            <label>Max contracts legacy</label>
+            <input data-path="${phase}.maxContracts" type="number" value="${rules.maxContracts}">
+          </div>
+          <div class="field">
+            <label>Max mini contracts</label>
+            <input data-path="${phase}.maxMiniContracts" type="number" value="${rules.maxMiniContracts ?? rules.maxContracts}">
+          </div>
+          <div class="field">
+            <label>Max micro contracts</label>
+            <input data-path="${phase}.maxMicroContracts" type="number" value="${rules.maxMicroContracts ?? ((rules.maxMiniContracts ?? rules.maxContracts) * 10)}">
+          </div>
+          <div class="field">
+            <label>Drawdown mode</label>
+            <select data-path="${phase}.drawdown.mode">
+              ${['EOD', 'INTRADAY', 'STATIC'].map(mode => `<option value="${mode}" ${rules.drawdown.mode === mode ? 'selected' : ''}>${mode}</option>`).join('')}
+            </select>
+          </div>
+          ${toggleField(`${phase}.drawdown.enabled`, 'Drawdown active', rules.drawdown.enabled)}
+          <div class="field">
+            <label>Drawdown amount</label>
+            <input data-path="${phase}.drawdown.amount" type="number" value="${rules.drawdown.amount}">
+          </div>
+          <div class="field">
+            <label>Lock at balance</label>
+            <input data-path="${phase}.drawdown.lockAtBalance" type="number" value="${rules.drawdown.lockAtBalance || ''}">
+          </div>
+          ${isEval ? `
+            ${toggleField(`${phase}.profitTarget.enabled`, 'Profit target active', rules.profitTarget?.enabled)}
+            <div class="field">
+              <label>Profit target</label>
+              <input data-path="${phase}.profitTarget.amount" type="number" value="${rules.profitTarget?.amount || 0}">
+            </div>` : ''}
+          ${toggleField(`${phase}.consistency.enabled`, 'Consistency active', rules.consistency?.enabled)}
+          <div class="field">
+            <label>Consistency percent</label>
+            <input data-path="${phase}.consistency.maxDailyProfitPercent" type="number" step="0.01" value="${rules.consistency?.maxDailyProfitPercent || 0}">
+          </div>
+          ${toggleField(`${phase}.minTradingDays.enabled`, 'Min days active', rules.minTradingDays?.enabled)}
+          <div class="field">
+            <label>Min trading days</label>
+            <input data-path="${phase}.minTradingDays.days" type="number" value="${rules.minTradingDays?.days || 0}">
+          </div>
+          ${!isEval ? `
+            ${toggleField(`${phase}.scaling.enabled`, 'Scaling active', rules.scaling?.enabled)}
+            <div class="field full">
+              <label>Scaling tiers JSON</label>
+              <textarea data-path="${phase}.scaling.tiers" data-kind="json">${escapeHtml(JSON.stringify(rules.scaling?.tiers || [], null, 2))}</textarea>
+            </div>` : ''}
+        </div>
+      `;
+      bindProfileInputs();
+    }
+
+    function renderPayoutEditor(payout) {
+      document.getElementById('profileEditor').innerHTML = `
+        <div class="grid">
+          ${toggleField('payoutRules.enabled', 'Payout active', payout.enabled)}
+          ${toggleField('payoutRules.deductPayout', 'Deduct payout', payout.deductPayout)}
+          ${toggleField('payoutRules.resetCycleAfterPayout', 'Reset cycle', payout.resetCycleAfterPayout)}
+          ${toggleField('payoutRules.lockDrawdownOnPayout', 'Lock DD on payout', payout.lockDrawdownOnPayout)}
+          <div class="field">
+            <label>Min trading days</label>
+            <input data-path="payoutRules.minTradingDays" type="number" value="${payout.minTradingDays || ''}">
+          </div>
+          <div class="field">
+            <label>Min profit per day</label>
+            <input data-path="payoutRules.minProfitPerDay" type="number" value="${payout.minProfitPerDay ?? ''}">
+          </div>
+          <div class="field">
+            <label>Min payout</label>
+            <input data-path="payoutRules.minPayoutAmount" type="number" value="${payout.minPayoutAmount}">
+          </div>
+          <div class="field">
+            <label>Max payout</label>
+            <input data-path="payoutRules.maxPayoutAmount" type="number" value="${payout.maxPayoutAmount || ''}">
+          </div>
+          <div class="field">
+            <label>Payout percent</label>
+            <input data-path="payoutRules.payoutPercent" type="number" step="0.01" value="${payout.payoutPercent || ''}">
+          </div>
+          <div class="field">
+            <label>Trader split</label>
+            <input data-path="payoutRules.payoutSplit" type="number" step="0.01" value="${payout.payoutSplit}">
+          </div>
+          <div class="field">
+            <label>Max payouts</label>
+            <input data-path="payoutRules.maxPayouts" type="number" value="${payout.maxPayouts || ''}">
+          </div>
+          <div class="field">
+            <label>Safety net balance</label>
+            <input data-path="payoutRules.safetyNetBalance" type="number" value="${payout.safetyNetBalance || ''}">
+          </div>
+          ${toggleField('payoutRules.consistency.enabled', 'Consistency active', payout.consistency?.enabled)}
+          <div class="field">
+            <label>Consistency percent</label>
+            <input data-path="payoutRules.consistency.maxDailyProfitPercent" type="number" step="0.01" value="${payout.consistency?.maxDailyProfitPercent || 0}">
+          </div>
+          <div class="field full">
+            <label>Payout caps CSV</label>
+            <input data-path="payoutRules.payoutCaps" data-kind="csv-number" value="${(payout.payoutCaps || []).join(',')}">
+          </div>
+        </div>
+      `;
+      bindProfileInputs();
+    }
+
+    function toggleField(path, label, checked) {
+      return `
+        <div class="field">
+          <label>${label}</label>
+          <input data-path="${path}" type="checkbox" ${checked ? 'checked' : ''}>
+        </div>
+      `;
+    }
+
+    function bindProfileInputs() {
+      document.querySelectorAll('[data-path]').forEach(input => {
+        input.addEventListener('input', updateProfileFromForm);
+        input.addEventListener('change', updateProfileFromForm);
+      });
+      ['profileName', 'profileCost', 'profileAccountSize'].forEach(id => {
+        document.getElementById(id).oninput = updateProfileFromForm;
+      });
+    }
+
+    function updateProfileFromForm() {
+      const profile = state.currentProfile;
+      profile.firm_name = document.getElementById('profileName').value;
+      profile.display_name = profile.firm_name;
+      profile.cost = numberOr(document.getElementById('profileCost').value, 0);
+      profile.account_size = numberOr(document.getElementById('profileAccountSize').value, 50000);
+      document.querySelectorAll('[data-path]').forEach(input => {
+        const path = input.dataset.path;
+        const kind = input.dataset.kind;
+        let value;
+        if (input.type === 'checkbox') value = input.checked;
+        else if (kind === 'json') {
+          try { value = JSON.parse(input.value || '[]'); } catch { return; }
+        } else if (kind === 'csv-number') {
+          value = input.value.trim() ? input.value.split(',').map(item => Number(item.trim())).filter(Number.isFinite) : undefined;
+        } else if (input.value === '') value = undefined;
+        else if (input.type === 'number') value = Number(input.value);
+        else value = input.value;
+        setDeep(profile, path, value);
+      });
+    }
+
+    function setDeep(obj, path, value) {
+      const parts = path.split('.');
+      let cur = obj;
+      for (let i = 0; i < parts.length - 1; i++) {
+        cur[parts[i]] ||= {};
+        cur = cur[parts[i]];
+      }
+      if (value === undefined) delete cur[parts[parts.length - 1]];
+      else cur[parts[parts.length - 1]] = value;
+    }
+
+    function numberOr(value, fallback) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    async function saveProfile() {
+      updateProfileFromForm();
+      const res = await fetch(`/api/profiles/${encodeURIComponent(state.currentProfileId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state.currentProfile)
+      });
+      const data = await res.json();
+      if (!res.ok) return setProfileStatus(data.details?.join(', ') || data.error, true);
+      setProfileStatus('Guardado');
+      await refreshProfiles(data.id);
+    }
+
+    async function validateProfile() {
+      updateProfileFromForm();
+      const res = await fetch('/api/profiles/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state.currentProfile)
+      });
+      const data = await res.json();
+      setProfileStatus(res.ok ? 'Valido' : (data.details || []).join(', '), !res.ok);
+    }
+
+    async function duplicateProfile() {
+      const res = await fetch(`/api/profiles/${encodeURIComponent(state.currentProfileId)}/duplicate`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) return setProfileStatus(data.error, true);
+      setProfileStatus('Duplicado');
+      await refreshProfiles(data.id);
+    }
+
+    async function restoreProfile() {
+      const res = await fetch(`/api/profiles/${encodeURIComponent(state.currentProfileId)}/restore`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) return setProfileStatus(data.error, true);
+      setProfileStatus('Restaurado');
+      await refreshProfiles(data.id);
+    }
+
+    async function refreshProfiles(selectedId) {
+      const res = await fetch('/api/profiles');
+      state.profiles = await res.json();
+      renderProfileSelect();
+      selectProfile(selectedId || state.currentProfileId);
+    }
+
+    function setProfileStatus(message, error = false) {
+      const el = document.getElementById('profileStatus');
+      el.textContent = message;
+      el.style.color = error ? 'var(--danger)' : 'var(--muted)';
+    }
+
+    function toggleSeedInput() {
+      document.getElementById('seedField').classList.toggle('hidden', document.getElementById('randomMode').value !== 'seeded');
+    }
+
+    function pointValueForInstrument(value) {
+      return { NQ: 20, MNQ: 2, ES: 50, MES: 5 }[value] || 20;
+    }
+
+    function phaseRiskFromControls(instrumentId, contractsId) {
+      const instrument = document.getElementById(instrumentId).value;
+      return {
+        instrument,
+        contracts: numberOr(document.getElementById(contractsId).value, 0),
+        pointValue: pointValueForInstrument(instrument)
+      };
+    }
+
+    function setJobControls(kind, running) {
+      const ids = {
+        simulation: ['runBtn', 'cancelSimBtn'],
+        optimizer: ['optimizeBtn', 'cancelOptimizerBtn'],
+        bankroll: ['bankrollBtn', 'cancelBankrollBtn']
+      }[kind];
+      const runBtn = document.getElementById(ids[0]);
+      const cancelBtn = document.getElementById(ids[1]);
+      runBtn.disabled = running;
+      cancelBtn.classList.toggle('hidden', !running);
+      cancelBtn.disabled = !running;
+    }
+
+    function setJobProgress(kind, job) {
+      const prefix = kind === 'simulation' ? 'sim' : kind;
+      const box = document.getElementById(`${prefix}ProgressBox`);
+      const message = document.getElementById(`${prefix}ProgressMessage`);
+      const percent = document.getElementById(`${prefix}ProgressPercent`);
+      const fill = document.getElementById(`${prefix}ProgressFill`);
+      const progress = job?.progress || { percent: 0, message: 'Preparando...' };
+      box.style.display = 'block';
+      message.textContent = progress.message || job.status;
+      percent.textContent = `${progress.percent || 0}%`;
+      fill.style.width = `${progress.percent || 0}%`;
+    }
+
+    function hideJobProgress(kind) {
+      const prefix = kind === 'simulation' ? 'sim' : kind;
+      document.getElementById(`${prefix}ProgressBox`).style.display = 'none';
+      document.getElementById(`${prefix}ProgressFill`).style.width = '0%';
+    }
+
+    async function pollJob(kind, jobId) {
+      while (state.currentJobs[kind] === jobId) {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
+        const job = await res.json();
+        if (!res.ok) throw new Error(job.error || 'Job not found');
+        setJobProgress(kind, job);
+        if (job.status === 'completed') return job.result;
+        if (job.status === 'failed') throw new Error(job.error || 'Job failed');
+        if (job.status === 'cancelled') throw new Error(job.error || 'Corrida cancelada');
+        await new Promise(resolve => setTimeout(resolve, 650));
+      }
+      throw new Error('Corrida reemplazada por una nueva ejecucion');
+    }
+
+    async function cancelCurrentJob(kind) {
+      const jobId = state.currentJobs[kind];
+      if (!jobId) return;
+      const prefix = kind === 'simulation' ? 'sim' : kind;
+      document.getElementById(`${prefix}ProgressMessage`).textContent = 'Cancelando...';
+      await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' });
+    }
+
+    async function runSimulation() {
+      const profileId = document.getElementById('profileSelect').value;
+      const folder = document.getElementById('folderSelect').value;
+      const mode = document.getElementById('randomMode').value;
+      const payload = {
+        profileId,
+        folder,
+        riskConfig: {
+          commissions: numberOr(document.getElementById('commissions').value, 0),
+          evaluationContracts: numberOr(document.getElementById('evalContracts').value, 0),
+          fundedPrePayoutContracts: numberOr(document.getElementById('preContracts').value, 0),
+          fundedPostPayoutContracts: numberOr(document.getElementById('postContracts').value, 0),
+          evaluation: phaseRiskFromControls('evalInstrument', 'evalContracts'),
+          fundedPrePayout: phaseRiskFromControls('fundedPreInstrument', 'preContracts'),
+          fundedPostPayout: phaseRiskFromControls('fundedPostInstrument', 'postContracts'),
+          useSmartScaling: document.getElementById('smartScaling').checked
+        },
+        randomization: {
+          mode,
+          seed: mode === 'seeded' ? document.getElementById('seedInput').value : undefined
+        }
+      };
+
+      setJobControls('simulation', true);
+      hideJobProgress('simulation');
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('resultsStatus').textContent = 'Procesando...';
+
+      try {
+        const res = await fetch('/api/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const start = await res.json();
+        if (!res.ok) throw new Error(start.error || 'Simulation failed');
+        state.currentJobs.simulation = start.jobId;
+        const data = await pollJob('simulation', start.jobId);
+        state.simulationId = data.simulationId;
+        state.randomization = data.randomization;
+        state.results = data.results.sort((a, b) => b.metrics.expectedValue - a.metrics.expectedValue);
+        document.getElementById('seedBadge').textContent = `${data.randomization.mode}: ${data.randomization.seed}`;
+        document.getElementById('instrumentBadge').textContent = `Eval ${document.getElementById('evalInstrument').value} / Funded ${document.getElementById('fundedPreInstrument').value}-${document.getElementById('fundedPostInstrument').value}`;
+        document.getElementById('runMeta').textContent = `${data.results.length} estrategias`;
+        renderResults();
+        renderBankrollStrategyOptions();
+      } catch (error) {
+        document.getElementById('resultsBody').innerHTML = `<tr><td colspan="15" class="negative">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById('resultsStatus').textContent = error.message;
+      } finally {
+        state.currentJobs.simulation = null;
+        setJobControls('simulation', false);
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    function renderResults() {
+      const tbody = document.getElementById('resultsBody');
+      const filter = document.getElementById('filterInput').value.toLowerCase();
+      const rows = state.results.filter(item => item.strategy.toLowerCase().includes(filter));
+      document.getElementById('resultsStatus').textContent = rows.length ? `${rows.length} resultados` : 'Sin resultados';
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="15" class="muted">Sin resultados.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(item => {
+        const m = item.metrics;
+        return `
+          <tr onclick="openTraceDrawer('${escapeHtml(encodeURIComponent(item.strategy))}')">
+            <td><strong>${escapeHtml(item.strategy)}</strong></td>
+            <td>${pct(m.avgWinRate)}</td>
+            <td class="${m.avgNetPerTrade >= 0 ? 'positive' : 'negative'}">${money(m.avgNetPerTrade)}</td>
+            <td>${m.medianTradesToPass.toFixed(0)} / ${m.medianTradesToBlowEval.toFixed(0)}</td>
+            <td><span class="positive">${money(m.avgEvalWin)}</span> / <span class="negative">${money(-m.avgEvalLoss)}</span></td>
+            <td><span class="badge ${m.passRatePercent >= 50 ? 'good' : 'warn'}">${pct(m.passRatePercent)}</span></td>
+            <td>${m.medianFundedTrades.toFixed(0)}</td>
+            <td><span class="positive">${money(m.avgFundedWin)}</span> / <span class="negative">${money(-m.avgFundedLoss)}</span></td>
+            <td>${pct(m.payoutRatePercent)}</td>
+            <td>${m.avgPayoutsCount.toFixed(1)}</td>
+            <td>${money(m.avgSinglePayoutAmount)}</td>
+            <td>${m.maxPayouts}</td>
+            <td class="${m.expectedValue >= 0 ? 'positive' : 'negative'}">${money(m.expectedValue)}</td>
+            <td>${m.medianMaxConsecutiveLosses.toFixed(1)}</td>
+            <td>${m.medianFundedLifespanDays.toFixed(1)}d</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderBankrollStrategyOptions() {
+      const container = document.getElementById('bankrollStrategies');
+      if (!state.results.length) {
+        container.innerHTML = '<span class="muted">Primero ejecuta el simulador.</span>';
+        return;
+      }
+      container.innerHTML = state.results.map((item, index) => `
+        <label class="strategy-option">
+          <input type="checkbox" class="bankroll-strategy" value="${escapeHtml(item.strategy)}" ${index < 5 ? 'checked' : ''}>
+          <span>${escapeHtml(item.strategy)} <span class="muted">EV ${money(item.metrics.expectedValue)}</span></span>
+        </label>
+      `).join('');
+    }
+
+    async function openTraceDrawer(encodedStrategy) {
+      const strategy = decodeURIComponent(encodedStrategy);
+      const drawer = document.getElementById('traceDrawer');
+      drawer.classList.add('open');
+      document.getElementById('traceTitle').textContent = strategy;
+      document.getElementById('traceStatus').textContent = 'Cargando trazas...';
+      document.getElementById('traceContent').innerHTML = '';
+      document.getElementById('traceTabs').innerHTML = '';
+      const res = await fetch(`/api/simulations/${encodeURIComponent(state.simulationId)}/strategies/${encodeURIComponent(strategy)}/traces`);
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById('traceStatus').textContent = data.error || 'Error';
+        return;
+      }
+      state.traces = data.traces;
+      state.activeTraceIndex = 0;
+      document.getElementById('traceStatus').textContent = `${data.traces.length} simulaciones`;
+      renderTraceTabs();
+      renderTrace();
+    }
+
+    function renderTraceTabs() {
+      document.getElementById('traceTabs').innerHTML = state.traces.map((trace, index) => `
+        <button class="tab ${index === state.activeTraceIndex ? 'active' : ''}" onclick="selectTrace(${index})">${escapeHtml(trace.label)}</button>
+      `).join('');
+    }
+
+    function selectTrace(index) {
+      state.activeTraceIndex = index;
+      renderTraceTabs();
+      renderTrace();
+    }
+
+    function renderTrace() {
+      const trace = state.traces[state.activeTraceIndex];
+      if (!trace) return;
+      const s = trace.summary;
+      document.getElementById('traceContent').innerHTML = `
+        <div class="trace-summary">
+          ${metric('Status', trace.status)}
+          ${metric('Balance', money(s.finalBalance))}
+          ${metric('Trades', s.totalTrades)}
+          ${metric('Eval', s.evalTrades)}
+          ${metric('Funded', s.fundedTrades)}
+          ${metric('Payouts', `${s.payoutsTaken} / ${money(s.totalPayoutAmount)}`)}
+        </div>
+        ${s.blownReason ? `<div class="badge bad" style="margin-bottom: 1rem;">${escapeHtml(s.blownReason)}</div>` : ''}
+        <div class="results-wrap" style="max-height: none;">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Phase</th>
+                <th>Instr</th>
+                <th>Close</th>
+                <th>Pts</th>
+                <th>Req/Exec</th>
+                <th>PnL</th>
+                <th>Balance</th>
+                <th>DD Level</th>
+                <th>Events</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${trace.trades.map(trade => `
+                <tr>
+                  <td>${trade.index}</td>
+                  <td><span class="badge phase">${trade.phase}</span></td>
+                  <td>${escapeHtml(trade.instrument || 'NQ')}</td>
+                  <td>${escapeHtml(trade.closeTime.slice(0, 10))}</td>
+                  <td>${trade.netPoints.toFixed(2)}</td>
+                  <td>${trade.requestedContracts ?? trade.contracts}/${trade.executedContracts ?? trade.contracts}</td>
+                  <td class="${trade.netPnl >= 0 ? 'positive' : 'negative'}">${money(trade.netPnl)}</td>
+                  <td>${money(trade.balanceAfter)}</td>
+                  <td>${money(trade.drawdownLevel)}</td>
+                  <td><div class="events">${trade.events.map(eventBadge).join('')}</div></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function metric(label, value) {
+      return `<div class="metric"><small>${label}</small><strong>${escapeHtml(value)}</strong></div>`;
+    }
+
+    function eventBadge(event) {
+      const cls = event.type === 'ACCOUNT_BLOWN' ? 'bad'
+        : event.type === 'EVAL_PASSED' || event.type === 'PAYOUT_TAKEN' ? 'good'
+        : event.type === 'CONSISTENCY_BLOCKED' ? 'warn'
+        : 'phase';
+      return `<span class="badge ${cls}" title="${escapeHtml(event.message)}">${escapeHtml(event.type)}</span>`;
+    }
+
+    function closeTraceDrawer() {
+      document.getElementById('traceDrawer').classList.remove('open');
+    }
+
+    function clearResults() {
+      state.results = [];
+      state.simulationId = null;
+      renderResults();
+      renderBankrollStrategyOptions();
+      document.getElementById('seedBadge').textContent = 'random';
+      document.getElementById('runMeta').textContent = 'Ready';
+    }
+
+    function parseRange(value) {
+      const parts = String(value || '1-1').split('-').map(item => Number(item.trim()));
+      const min = Number.isFinite(parts[0]) ? parts[0] : 1;
+      const max = Number.isFinite(parts[1]) ? parts[1] : min;
+      return { min: Math.max(1, min), max: Math.max(min, max) };
+    }
+
+    async function runOptimizer() {
+      const profileId = document.getElementById('profileSelect').value;
+      const folder = document.getElementById('folderSelect').value;
+      const strategy = document.getElementById('optimizerStrategy').value.trim();
+      if (!strategy && !state.results.length) {
+        document.getElementById('optimizerBody').innerHTML = '<tr><td colspan="10" class="negative">Primero ejecuta el simulador o escribe una estrategia especifica para optimizar.</td></tr>';
+        document.getElementById('optimizerStatus').textContent = 'Faltan estrategias';
+        return;
+      }
+      setJobControls('optimizer', true);
+      hideJobProgress('optimizer');
+      document.getElementById('optimizerStatus').textContent = 'Optimizando...';
+      try {
+        const payload = {
+          profileId,
+          folder,
+          strategy: strategy || undefined,
+          iterations: numberOr(document.getElementById('optimizerIterations').value, 1000),
+          randomization: { mode: 'seeded', seed: document.getElementById('optimizerSeed').value || 'optimizer-v1' },
+          commissions: numberOr(document.getElementById('commissions').value, 4),
+          useSmartScaling: 'both',
+          maxCandidates: numberOr(document.getElementById('optimizerMaxCandidates').value, 60),
+          evaluation: { instruments: ['NQ', 'MNQ'], contracts: parseRange(document.getElementById('optEvalRange').value) },
+          fundedPrePayout: { instruments: ['NQ', 'MNQ'], contracts: parseRange(document.getElementById('optPreRange').value) },
+          fundedPostPayout: { instruments: ['NQ', 'MNQ'], contracts: parseRange(document.getElementById('optPostRange').value) }
+        };
+        const res = await fetch('/api/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const start = await res.json();
+        if (!res.ok) throw new Error(start.error || 'Optimizer failed');
+        state.currentJobs.optimizer = start.jobId;
+        const data = await pollJob('optimizer', start.jobId);
+        state.optimizerResults = data.results;
+        document.getElementById('optimizerStatus').textContent = `${data.candidateCount} candidatos`;
+        renderOptimizerResults();
+      } catch (error) {
+        document.getElementById('optimizerBody').innerHTML = `<tr><td colspan="10" class="negative">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById('optimizerStatus').textContent = 'Error';
+      } finally {
+        state.currentJobs.optimizer = null;
+        setJobControls('optimizer', false);
+      }
+    }
+
+    function renderOptimizerResults() {
+      const tbody = document.getElementById('optimizerBody');
+      const rows = state.optimizerResults || [];
+      document.getElementById('optimizerResultStatus').textContent = rows.length ? `${rows.length} combinaciones` : 'Sin optimizacion';
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="muted">Sin combinaciones.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(row => {
+        const m = row.metrics;
+        return `
+          <tr>
+            <td>${(row.badges || []).map(badge => `<span class="badge good">${escapeHtml(badge)}</span>`).join(' ')}</td>
+            <td>${escapeHtml(row.strategy)}</td>
+            <td>${escapeHtml(row.candidate.label)}</td>
+            <td class="${row.score >= 0 ? 'positive' : 'negative'}">${Number(row.score).toFixed(2)}</td>
+            <td class="${m.expectedValue >= 0 ? 'positive' : 'negative'}">${money(m.expectedValue)}</td>
+            <td>${pct(m.passRatePercent)}</td>
+            <td>${pct(m.payoutRatePercent)}</td>
+            <td>${pct(m.fundedBlowUpRate)}</td>
+            <td>${m.avgDaysToPass.toFixed(1)}</td>
+            <td>${m.medianMaxConsecutiveLosses.toFixed(1)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function runBankroll() {
+      const selectedStrategies = [...document.querySelectorAll('.bankroll-strategy:checked')].map(input => input.value);
+      if (!state.results.length || !selectedStrategies.length) {
+        document.getElementById('bankrollEventsBody').innerHTML = '<tr><td colspan="6" class="negative">Primero ejecuta el simulador y selecciona estrategias.</td></tr>';
+        document.getElementById('bankrollStatus').textContent = 'Faltan estrategias';
+        return;
+      }
+
+      const mode = document.getElementById('bankrollRandomMode').value;
+      const payload = {
+        profileId: document.getElementById('profileSelect').value,
+        folder: document.getElementById('folderSelect').value,
+        strategies: selectedStrategies,
+        initialBankroll: numberOr(document.getElementById('initialBankroll').value, 0),
+        maxActiveAccountsPerDay: numberOr(document.getElementById('maxActiveAccounts').value, 3),
+        horizonMonths: numberOr(document.getElementById('bankrollMonths').value, 12),
+        iterations: numberOr(document.getElementById('bankrollIterations').value, 1000),
+        reinvestmentPercent: numberOr(document.getElementById('reinvestmentPercent').value, 100) / 100,
+        riskConfig: {
+          commissions: numberOr(document.getElementById('commissions').value, 0),
+          evaluationContracts: numberOr(document.getElementById('evalContracts').value, 0),
+          fundedPrePayoutContracts: numberOr(document.getElementById('preContracts').value, 0),
+          fundedPostPayoutContracts: numberOr(document.getElementById('postContracts').value, 0),
+          evaluation: phaseRiskFromControls('evalInstrument', 'evalContracts'),
+          fundedPrePayout: phaseRiskFromControls('fundedPreInstrument', 'preContracts'),
+          fundedPostPayout: phaseRiskFromControls('fundedPostInstrument', 'postContracts'),
+          useSmartScaling: document.getElementById('smartScaling').checked
+        },
+        randomization: {
+          mode,
+          seed: mode === 'seeded' ? document.getElementById('bankrollSeed').value : undefined
+        }
+      };
+
+      setJobControls('bankroll', true);
+      hideJobProgress('bankroll');
+      document.getElementById('bankrollStatus').textContent = 'Simulando...';
+      try {
+        const res = await fetch('/api/bankroll/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const start = await res.json();
+        if (!res.ok) throw new Error(start.error || 'Bankroll simulation failed');
+        state.currentJobs.bankroll = start.jobId;
+        const data = await pollJob('bankroll', start.jobId);
+        state.bankrollResults = data;
+        renderBankrollResults();
+      } catch (error) {
+        document.getElementById('bankrollEventsBody').innerHTML = `<tr><td colspan="6" class="negative">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById('bankrollStatus').textContent = 'Error';
+      } finally {
+        state.currentJobs.bankroll = null;
+        setJobControls('bankroll', false);
+      }
+    }
+
+    function renderBankrollResults() {
+      const data = state.bankrollResults;
+      if (!data) return;
+      document.getElementById('bankrollStatus').textContent = `${data.iterations} iteraciones`;
+      document.getElementById('bankrollResultStatus').textContent = `Ruina ${pct(data.riskOfRuinPercent)} / Stalled ${pct(data.stalledPercent)}`;
+      document.getElementById('bankrollMetrics').innerHTML = [
+        metric('Risk of ruin', pct(data.riskOfRuinPercent)),
+        metric('Stalled', pct(data.stalledPercent)),
+        metric('Median final', money(data.medianFinalBankroll)),
+        metric('P10 / P90', `${money(data.p10FinalBankroll)} / ${money(data.p90FinalBankroll)}`),
+        metric('Median max DD', money(data.medianMaxDrawdown)),
+        metric('Avg payouts', Number(data.avgPayouts).toFixed(1)),
+        metric('Avg purchased', Number(data.avgAccountsPurchased).toFixed(1)),
+        metric('Avg blown', Number(data.avgAccountsBlown).toFixed(1)),
+        metric('Avg withdrawn', money(data.avgWithdrawnProfit)),
+        metric('Horizon', `${data.horizonDays}d`)
+      ].join('');
+      renderBankrollChart(data.representativeCurves?.[0]?.curve || []);
+      renderBankrollEvents(data.eventSamples || []);
+    }
+
+    function renderBankrollChart(curve) {
+      const el = document.getElementById('bankrollChart');
+      if (!curve.length) {
+        el.innerHTML = '<div class="section muted">Sin curva.</div>';
+        return;
+      }
+      const width = 900;
+      const height = 240;
+      const values = curve.map(point => point.bankroll);
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const span = Math.max(1, max - min);
+      const points = curve.map((point, index) => {
+        const x = curve.length === 1 ? 0 : (index / (curve.length - 1)) * width;
+        const y = height - ((point.bankroll - min) / span) * (height - 28) - 14;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+      el.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" width="100%" height="240" role="img">
+          <polyline points="${points}" fill="none" stroke="var(--accent)" stroke-width="3" />
+          <text x="12" y="24" fill="var(--muted)" font-size="13">${money(max)}</text>
+          <text x="12" y="${height - 10}" fill="var(--muted)" font-size="13">${money(min)}</text>
+        </svg>
+      `;
+    }
+
+    function renderBankrollEvents(events) {
+      const tbody = document.getElementById('bankrollEventsBody');
+      if (!events.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin eventos.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = events.slice(0, 120).map(event => `
+        <tr>
+          <td>${event.day}</td>
+          <td><span class="badge ${event.type === 'ACCOUNT_BLOWN' || event.type === 'BANKROLL_RUINED' ? 'bad' : event.type === 'PAYOUT_TAKEN' || event.type === 'EVAL_PASSED' ? 'good' : 'phase'}">${escapeHtml(event.type)}</span></td>
+          <td>${escapeHtml(event.strategy || '')}</td>
+          <td>${escapeHtml(event.accountId || '')}</td>
+          <td class="${Number(event.amount || 0) >= 0 ? 'positive' : 'negative'}">${event.amount === undefined ? '' : money(event.amount)}</td>
+          <td>${money(event.bankrollAfter)}</td>
+        </tr>
+      `).join('');
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
