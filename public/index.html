@@ -270,6 +270,10 @@
       letter-spacing: 0;
     }
 
+    th[title] {
+      cursor: help;
+    }
+
     tbody tr {
       cursor: pointer;
     }
@@ -744,21 +748,21 @@
           <table>
             <thead>
               <tr>
-                <th>Estrategia</th>
-                <th>WR</th>
-                <th>Net/Trade</th>
-                <th>Eval P/F</th>
-                <th>Eval W/L</th>
-                <th>Pass</th>
-                <th>Funded Trades</th>
-                <th>Funded W/L</th>
-                <th>Payout</th>
-                <th>Avg #</th>
-                <th>Avg Payout</th>
-                <th>Max</th>
-                <th>EV</th>
-                <th>MCL</th>
-                <th>Life</th>
+                <th title="Nombre del archivo CSV de la estrategia simulada.">Estrategia</th>
+                <th title="Win rate promedio: porcentaje de trades ganadores en todas las iteraciones Monte Carlo.">WR</th>
+                <th title="Promedio neto por trade despues de comisiones y friccion configurada.">Net/Trade</th>
+                <th title="Mediana de trades necesarios para pasar evaluacion / mediana de trades hasta quemar la evaluacion.">Eval P/F</th>
+                <th title="Promedio de ganancia por trade ganador en evaluacion / promedio de perdida por trade perdedor en evaluacion.">Eval W/L</th>
+                <th title="Porcentaje de iteraciones en las que la estrategia pasa la fase de evaluacion.">Pass</th>
+                <th title="Mediana de trades operados en funded despues de pasar evaluacion.">Funded Trades</th>
+                <th title="Promedio de ganancia por trade ganador en funded / promedio de perdida por trade perdedor en funded.">Funded W/L</th>
+                <th title="Porcentaje de iteraciones que lograron al menos un payout.">Payout</th>
+                <th title="Cantidad promedio de payouts cobrados entre las cuentas que lograron payout.">Avg #</th>
+                <th title="Monto promedio de cada payout individual cobrado por el trader.">Avg Payout</th>
+                <th title="Maximo numero de payouts alcanzado en alguna iteracion Monte Carlo.">Max</th>
+                <th title="Expected Value: payout promedio por evaluacion comprada menos el costo del perfil.">EV</th>
+                <th title="Mediana de la maxima racha de perdidas consecutivas observada por iteracion.">MCL</th>
+                <th title="Mediana de dias de vida de la cuenta funded antes de quemarse, graduarse o terminar la muestra.">Life</th>
               </tr>
             </thead>
             <tbody id="resultsBody">
