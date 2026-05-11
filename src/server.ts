@@ -13,6 +13,16 @@ import { badgesFor, scoreRiskAdjustedEV } from './optimizer/scoring';
 import { OptimizerRequest, OptimizerResultRow } from './optimizer/types';
 import { BankrollEngine } from './bankroll/bankrollEngine';
 import { BankrollRequest } from './bankroll/types';
+import { MonteCarloResults } from './monteCarloEngine';
+import { DailyPnlPoint } from './live/types';
+import { buildDailyPointSeries } from './live/dailySeries';
+import { buildLivePortfolio } from './live/portfolioSelector';
+
+interface SimulationResultCache {
+  strategy: string;
+  metrics: MonteCarloResults;
+  dailySeries: DailyPnlPoint[];
+}
 
 interface SimulationSession {
   id: string;
@@ -21,6 +31,7 @@ interface SimulationSession {
   riskProfile: RiskProfile;
   randomization: RandomizationConfig;
   effectiveSeed: string;
+  results: SimulationResultCache[];
   createdAt: number;
 }
 
@@ -197,6 +208,21 @@ app.post('/api/bankroll/simulate', async (req, res) => {
   void runBankrollJob(job, body);
 });
 
+app.post('/api/live/portfolio', (req, res) => {
+  const sessionId = String(req.body?.simulationId || '');
+  const session = sessions.get(sessionId);
+  if (!session || !session.results.length) {
+    return res.status(400).json({ error: 'Primero ejecuta el simulador para generar estrategias disponibles.' });
+  }
+
+  res.json(buildLivePortfolio({
+    strategies: session.results,
+    topN: req.body?.topN,
+    diversityWeight: req.body?.diversityWeight,
+    minOverlapDays: req.body?.minOverlapDays
+  }));
+});
+
 app.get('/api/simulations/:id/strategies/:strategy/traces', async (req, res) => {
   const session = sessions.get(req.params.id);
   if (!session) return res.status(404).json({ error: 'Simulation session not found' });
@@ -247,7 +273,7 @@ async function runSimulationJob(job: JobRecord, input: {
       throw new Error('No strategies found in the selected folder');
     }
 
-    const results: Array<{ strategy: string; metrics: ReturnType<MonteCarloEngine['run']> }> = [];
+    const results: SimulationResultCache[] = [];
     updateJobProgress(job, 0, files.length, `0/${files.length} estrategias`);
 
     for (const [index, strategyFile] of files.entries()) {
@@ -260,7 +286,11 @@ async function runSimulationJob(job: JobRecord, input: {
         seed: strategySeed
       });
       const metrics = engine.run();
-      results.push({ strategy: strategyFile, metrics });
+      results.push({
+        strategy: strategyFile,
+        metrics,
+        dailySeries: buildDailyPointSeries(trades)
+      });
       updateJobProgress(job, index + 1, files.length, `${index + 1}/${files.length} estrategias`);
       await yieldToEventLoop();
     }
@@ -272,6 +302,7 @@ async function runSimulationJob(job: JobRecord, input: {
       riskProfile,
       randomization: randomizationConfig,
       effectiveSeed,
+      results,
       createdAt: Date.now()
     });
 
@@ -281,7 +312,7 @@ async function runSimulationJob(job: JobRecord, input: {
         mode: randomizationConfig.mode,
         seed: effectiveSeed
       },
-      results
+      results: results.map(({ strategy, metrics }) => ({ strategy, metrics }))
     });
   } catch (error: any) {
     failJob(job, error);

@@ -48,6 +48,9 @@ export class BankrollEngine {
 
   private buildResponse(results: BankrollIterationResult[], iterations: number, horizonDays: number): BankrollResponse {
     const finalBankrolls = results.map(result => result.finalBankroll);
+    const deployableBankrolls = results.map(result => result.finalDeployableBankroll);
+    const surplusProfits = results.map(result => result.finalSurplusProfit);
+    const reserveCoveragePercents = results.map(result => result.finalReserveCoveragePercent);
     const withdrawnProfits = results.map(result => result.finalWithdrawnProfit);
     const totalNetWorths = results.map(result => result.finalTotalNetWorth);
     const netProfits = results.map(result => result.finalNetProfit);
@@ -63,6 +66,12 @@ export class BankrollEngine {
       stalledPercent: (stalledCount / iterations) * 100,
       medianFinalBankroll: percentile(finalBankrolls, 0.5),
       medianOperatingBankroll: percentile(finalBankrolls, 0.5),
+      operatingReserveTarget: this.operatingReserveTarget(),
+      medianDeployableBankroll: percentile(deployableBankrolls, 0.5),
+      medianSurplusProfit: percentile(surplusProfits, 0.5),
+      p10SurplusProfit: percentile(surplusProfits, 0.1),
+      p90SurplusProfit: percentile(surplusProfits, 0.9),
+      medianReserveCoveragePercent: percentile(reserveCoveragePercents, 0.5),
       p10OperatingBankroll: percentile(finalBankrolls, 0.1),
       p90OperatingBankroll: percentile(finalBankrolls, 0.9),
       medianWithdrawnProfit: percentile(withdrawnProfits, 0.5),
@@ -80,6 +89,9 @@ export class BankrollEngine {
         id: `curve-${index + 1}`,
         status: result.status,
         finalBankroll: result.finalBankroll,
+        finalDeployableBankroll: result.finalDeployableBankroll,
+        finalSurplusProfit: result.finalSurplusProfit,
+        finalReserveCoveragePercent: result.finalReserveCoveragePercent,
         finalWithdrawnProfit: result.finalWithdrawnProfit,
         finalTotalNetWorth: result.finalTotalNetWorth,
         finalNetProfit: result.finalNetProfit,
@@ -96,6 +108,7 @@ export class BankrollEngine {
     const accountCost = Math.max(0, this.input.profile.cost);
     const maxActiveAccounts = Math.max(1, Number(request.maxActiveAccountsPerDay || 3));
     const reinvestmentRate = Math.max(0, Math.min(1, Number(request.reinvestmentPercent ?? 1)));
+    const reserveTarget = this.operatingReserveTarget();
     const rng = createSeededRng(`${this.effectiveSeed}:bankroll:${iteration}`);
     let strategyCursor = Math.floor(rng() * this.input.strategies.length);
     let bankroll = Number(request.initialBankroll || 0);
@@ -140,7 +153,7 @@ export class BankrollEngine {
           withdrawnProfitAfter: withdrawnProfit,
           totalNetWorthAfter: bankroll + withdrawnProfit
         });
-        curve.push(this.curvePoint(day, bankroll, withdrawnProfit, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken));
+        curve.push(this.curvePoint(day, bankroll, withdrawnProfit, reserveTarget, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken));
         break;
       }
 
@@ -189,21 +202,27 @@ export class BankrollEngine {
           withdrawnProfitAfter: withdrawnProfit,
           totalNetWorthAfter: bankroll + withdrawnProfit
         });
-        curve.push(this.curvePoint(day, bankroll, withdrawnProfit, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken));
+        curve.push(this.curvePoint(day, bankroll, withdrawnProfit, reserveTarget, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken));
         break;
       }
 
-      curve.push(this.curvePoint(day, bankroll, withdrawnProfit, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken));
+      curve.push(this.curvePoint(day, bankroll, withdrawnProfit, reserveTarget, activeAccounts.length, accountsPurchased, accountsBlown, payoutsTaken));
     }
 
     const finalTotalNetWorth = bankroll + withdrawnProfit;
     const initialBankroll = Number(request.initialBankroll || 0);
     const finalNetProfit = finalTotalNetWorth - initialBankroll;
     const roiPercent = initialBankroll > 0 ? (finalNetProfit / initialBankroll) * 100 : 0;
+    const finalDeployableBankroll = this.deployableBankroll(bankroll, reserveTarget);
+    const finalSurplusProfit = this.surplusProfit(bankroll, withdrawnProfit, reserveTarget);
+    const finalReserveCoveragePercent = this.reserveCoveragePercent(bankroll, reserveTarget);
 
     return {
       status,
       finalBankroll: bankroll,
+      finalDeployableBankroll,
+      finalSurplusProfit,
+      finalReserveCoveragePercent,
       finalWithdrawnProfit: withdrawnProfit,
       finalTotalNetWorth,
       finalNetProfit,
@@ -288,6 +307,7 @@ export class BankrollEngine {
     day: number,
     bankroll: number,
     withdrawnProfit: number,
+    reserveTarget: number,
     activeAccounts: number,
     accountsPurchased: number,
     accountsBlown: number,
@@ -298,6 +318,9 @@ export class BankrollEngine {
     return {
       day,
       bankroll,
+      deployableBankroll: this.deployableBankroll(bankroll, reserveTarget),
+      surplusProfit: this.surplusProfit(bankroll, withdrawnProfit, reserveTarget),
+      reserveCoveragePercent: this.reserveCoveragePercent(bankroll, reserveTarget),
       withdrawnProfit,
       totalNetWorth,
       netProfit: totalNetWorth - initialBankroll,
@@ -306,6 +329,25 @@ export class BankrollEngine {
       accountsBlown,
       payoutsTaken
     };
+  }
+
+  private operatingReserveTarget(): number {
+    const configured = Number(this.input.request.operatingReserveTarget);
+    if (Number.isFinite(configured) && configured >= 0) return configured;
+    return Math.max(0, Number(this.input.request.initialBankroll || 0));
+  }
+
+  private deployableBankroll(bankroll: number, reserveTarget: number): number {
+    return Math.max(0, Math.min(bankroll, reserveTarget));
+  }
+
+  private surplusProfit(bankroll: number, withdrawnProfit: number, reserveTarget: number): number {
+    return Math.max(0, bankroll - reserveTarget) + withdrawnProfit;
+  }
+
+  private reserveCoveragePercent(bankroll: number, reserveTarget: number): number {
+    if (reserveTarget <= 0) return 100;
+    return (this.deployableBankroll(bankroll, reserveTarget) / reserveTarget) * 100;
   }
 
   private money(value: number): string {

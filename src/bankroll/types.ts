@@ -16,6 +16,7 @@ export interface BankrollRequest {
   horizonMonths: number;
   iterations: number;
   reinvestmentPercent: number;
+  operatingReserveTarget?: number;
   randomization?: RandomizationConfig;
 }
 
@@ -48,6 +49,9 @@ export interface BankrollEvent {
 export interface BankrollCurvePoint {
   day: number;
   bankroll: number;
+  deployableBankroll: number;
+  surplusProfit: number;
+  reserveCoveragePercent: number;
   withdrawnProfit: number;
   totalNetWorth: number;
   netProfit: number;
@@ -61,6 +65,9 @@ export interface BankrollRepresentativeCurve {
   id: string;
   status: 'COMPLETED' | 'RUINED' | 'STALLED';
   finalBankroll: number;
+  finalDeployableBankroll: number;
+  finalSurplusProfit: number;
+  finalReserveCoveragePercent: number;
   finalWithdrawnProfit: number;
   finalTotalNetWorth: number;
   finalNetProfit: number;
@@ -72,6 +79,9 @@ export interface BankrollRepresentativeCurve {
 export interface BankrollIterationResult {
   status: 'COMPLETED' | 'RUINED' | 'STALLED';
   finalBankroll: number;
+  finalDeployableBankroll: number;
+  finalSurplusProfit: number;
+  finalReserveCoveragePercent: number;
   finalWithdrawnProfit: number;
   finalTotalNetWorth: number;
   finalNetProfit: number;
@@ -92,6 +102,12 @@ export interface BankrollResponse {
   stalledPercent: number;
   medianFinalBankroll: number;
   medianOperatingBankroll: number;
+  operatingReserveTarget: number;
+  medianDeployableBankroll: number;
+  medianSurplusProfit: number;
+  p10SurplusProfit: number;
+  p90SurplusProfit: number;
+  medianReserveCoveragePercent: number;
   p10OperatingBankroll: number;
   p90OperatingBankroll: number;
   medianWithdrawnProfit: number;

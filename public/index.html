@@ -643,6 +643,10 @@
               <input id="initialBankroll" type="number" value="1000" min="0" step="50">
             </div>
             <div class="field">
+              <label for="operatingReserveTarget">Reserva operativa</label>
+              <input id="operatingReserveTarget" type="number" value="1000" min="0" step="50">
+            </div>
+            <div class="field">
               <label for="maxActiveAccounts">Cuentas activas/dia</label>
               <input id="maxActiveAccounts" type="number" value="3" min="1" step="1">
             </div>
@@ -749,16 +753,25 @@
             <thead>
               <tr>
                 <th title="Nombre del archivo CSV de la estrategia simulada.">Estrategia</th>
+                <th title="Senales rapidas del ranking live: pick recomendado, EV alto, estabilidad, blow-up o correlacion alta.">Badges</th>
+                <th title="Score balanceado para seleccionar estrategias live. Combina EV, pass rate, payout rate, supervivencia funded, estabilidad y profundidad de payouts.">Live Score</th>
                 <th title="Win rate promedio: porcentaje de trades ganadores en todas las iteraciones Monte Carlo.">WR</th>
                 <th title="Promedio neto por trade despues de comisiones y friccion configurada.">Net/Trade</th>
                 <th title="Mediana de trades necesarios para pasar evaluacion / mediana de trades hasta quemar la evaluacion.">Eval P/F</th>
                 <th title="Promedio de ganancia por trade ganador en evaluacion / promedio de perdida por trade perdedor en evaluacion.">Eval W/L</th>
                 <th title="Porcentaje de iteraciones en las que la estrategia pasa la fase de evaluacion.">Pass</th>
+                <th title="Cantidad de iteraciones donde la cuenta se quemo en evaluacion antes de pasar.">Eval Blown</th>
+                <th title="Dias promedio necesarios para pasar evaluacion entre las iteraciones que si pasaron.">Days Pass</th>
+                <th title="Profit factor promedio: ganancias brutas divididas entre perdidas brutas. Mayor a 1 indica ventaja bruta.">PF</th>
                 <th title="Mediana de trades operados en funded despues de pasar evaluacion.">Funded Trades</th>
                 <th title="Promedio de ganancia por trade ganador en funded / promedio de perdida por trade perdedor en funded.">Funded W/L</th>
                 <th title="Porcentaje de iteraciones que lograron al menos un payout.">Payout</th>
+                <th title="Porcentaje de iteraciones que lograron tres o mas payouts. Mide profundidad y repetibilidad en funded.">3+ Payout</th>
+                <th title="Porcentaje de cuentas que pasaron evaluacion pero se quemaron en funded antes de lograr payout.">Blow-up</th>
                 <th title="Cantidad promedio de payouts cobrados entre las cuentas que lograron payout.">Avg #</th>
                 <th title="Monto promedio de cada payout individual cobrado por el trader.">Avg Payout</th>
+                <th title="Payout promedio por evaluacion comprada / payout mediano entre cuentas que cobraron.">Avg/Med Acct</th>
+                <th title="Retorno mensual mediano estimado usando payout mediano y vida funded mediana.">Monthly</th>
                 <th title="Maximo numero de payouts alcanzado en alguna iteracion Monte Carlo.">Max</th>
                 <th title="Expected Value: payout promedio por evaluacion comprada menos el costo del perfil.">EV</th>
                 <th title="Mediana de la maxima racha de perdidas consecutivas observada por iteracion.">MCL</th>
@@ -766,11 +779,75 @@
               </tr>
             </thead>
             <tbody id="resultsBody">
-              <tr><td colspan="15" class="muted">Ejecuta una simulacion para ver resultados.</td></tr>
+              <tr><td colspan="24" class="muted">Ejecuta una simulacion para ver resultados.</td></tr>
             </tbody>
           </table>
         </div>
         <div id="loading" class="loading">Procesando simulaciones...</div>
+      </section>
+
+      <section class="panel" style="margin-top: 1rem;">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Live Portfolio</div>
+            <div class="status">Ranking para seleccionar estrategias candidatas a operar en vivo.</div>
+          </div>
+          <span id="livePortfolioStatus" class="status">Sin ranking live</span>
+        </div>
+        <div class="section">
+          <div class="toolbar" style="margin-bottom: 0.75rem;">
+            <label style="width: 180px; margin: 0;">
+              Estrategias live
+              <input id="liveTopN" type="number" value="5" min="1" step="1">
+            </label>
+            <label style="width: 180px; margin: 0;">
+              Peso diversificacion
+              <input id="liveDiversityWeight" type="number" value="0.35" min="0" max="1" step="0.05">
+            </label>
+            <button class="secondary" onclick="runLivePortfolio()">Generar ranking live</button>
+          </div>
+          <div class="results-wrap" style="max-height: 340px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Estrategia</th>
+                  <th>Badges</th>
+                  <th>Score</th>
+                  <th>Base</th>
+                  <th>Corr</th>
+                  <th>EV</th>
+                  <th>Pass</th>
+                  <th>Payout</th>
+                  <th>Blow-up</th>
+                  <th>Days</th>
+                  <th>3+</th>
+                </tr>
+              </thead>
+              <tbody id="livePortfolioBody">
+                <tr><td colspan="12" class="muted">Ejecuta una simulacion y genera el ranking live.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel-title" style="margin: 1rem 0 0.5rem;">Near misses</div>
+          <div class="results-wrap" style="max-height: 260px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Estrategia</th>
+                  <th>Score</th>
+                  <th>Corr</th>
+                  <th>EV</th>
+                  <th>Payout</th>
+                  <th>Razones</th>
+                </tr>
+              </thead>
+              <tbody id="liveNearMissBody">
+                <tr><td colspan="6" class="muted">Sin near misses.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <section class="panel" style="margin-top: 1rem;">
@@ -810,7 +887,9 @@
           <div id="bankrollMetrics" class="metric-grid"></div>
           <div class="chart-toolbar">
             <select id="bankrollChartMode" onchange="renderBankrollResults()" style="width: 260px;">
-              <option value="bankroll">Bankroll operativo</option>
+              <option value="bankroll">Cash balance</option>
+              <option value="deployableBankroll">Deployable bankroll</option>
+              <option value="surplusProfit">Surplus profit</option>
               <option value="withdrawnProfit">Ganancia retirada</option>
               <option value="totalNetWorth">Total net worth</option>
             </select>
@@ -864,6 +943,7 @@
       randomization: null,
       optimizerResults: [],
       bankrollResults: null,
+      livePortfolio: null,
       currentJobs: {
         simulation: null,
         optimizer: null,
@@ -880,6 +960,35 @@
 
     function pct(value) {
       return `${Number(value || 0).toFixed(1)}%`;
+    }
+
+    function scoreRiskAdjustedEV(metrics) {
+      const pass = Number(metrics.passRatePercent || 0) / 100;
+      const payout = Number(metrics.payoutRatePercent || 0) / 100;
+      const fundedSurvival = Math.max(0, 1 - Number(metrics.fundedBlowUpRate || 0) / 100);
+      const lossPenalty = 1 / (1 + Math.max(0, Number(metrics.medianMaxConsecutiveLosses || 0) - 4) * 0.08);
+      const timePenalty = 1 / (1 + Math.max(0, Number(metrics.avgDaysToPass || 0) - 20) * 0.02);
+      return Number(metrics.expectedValue || 0) * pass * payout * fundedSurvival * lossPenalty * timePenalty;
+    }
+
+    function baseLiveScore(metrics) {
+      const payoutDepthBonus = 1 + Math.max(0, Number(metrics.percentAccounts3PlusPayouts || 0)) / 100 * 0.25;
+      return scoreRiskAdjustedEV(metrics) * payoutDepthBonus;
+    }
+
+    function scoreText(value) {
+      return Number(value || 0).toFixed(2);
+    }
+
+    function badgeClass(label) {
+      if (label.includes('Blow-up') || label.includes('Correlated')) return 'warn';
+      if (label.includes('Live') || label.includes('Stable') || label.includes('EV')) return 'good';
+      return 'phase';
+    }
+
+    function liveRowForStrategy(strategy) {
+      return state.livePortfolio?.portfolio?.find(row => row.strategy === strategy)
+        || state.livePortfolio?.nearMisses?.find(row => row.strategy === strategy);
     }
 
     function escapeHtml(value) {
@@ -899,6 +1008,13 @@
       renderFolderSelect();
       selectProfile(state.profiles[0]?.id);
       toggleSeedInput();
+      document.getElementById('initialBankroll').addEventListener('input', event => {
+        const reserve = document.getElementById('operatingReserveTarget');
+        if (!reserve.dataset.touched) reserve.value = event.target.value;
+      });
+      document.getElementById('operatingReserveTarget').addEventListener('input', event => {
+        event.target.dataset.touched = 'true';
+      });
     }
 
     function renderProfileSelect() {
@@ -1293,14 +1409,16 @@
         const data = await pollJob('simulation', start.jobId);
         state.simulationId = data.simulationId;
         state.randomization = data.randomization;
+        state.livePortfolio = null;
         state.results = data.results.sort((a, b) => b.metrics.expectedValue - a.metrics.expectedValue);
         document.getElementById('seedBadge').textContent = `${data.randomization.mode}: ${data.randomization.seed}`;
         document.getElementById('instrumentBadge').textContent = `Eval ${document.getElementById('evalInstrument').value} / Funded ${document.getElementById('fundedPreInstrument').value}-${document.getElementById('fundedPostInstrument').value}`;
         document.getElementById('runMeta').textContent = `${data.results.length} estrategias`;
         renderResults();
         renderBankrollStrategyOptions();
+        renderLivePortfolio();
       } catch (error) {
-        document.getElementById('resultsBody').innerHTML = `<tr><td colspan="15" class="negative">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById('resultsBody').innerHTML = `<tr><td colspan="24" class="negative">${escapeHtml(error.message)}</td></tr>`;
         document.getElementById('resultsStatus').textContent = error.message;
       } finally {
         state.currentJobs.simulation = null;
@@ -1315,24 +1433,36 @@
       const rows = state.results.filter(item => item.strategy.toLowerCase().includes(filter));
       document.getElementById('resultsStatus').textContent = rows.length ? `${rows.length} resultados` : 'Sin resultados';
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="15" class="muted">Sin resultados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="24" class="muted">Sin resultados.</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map(item => {
         const m = item.metrics;
+        const liveRow = liveRowForStrategy(item.strategy);
+        const liveScore = liveRow?.adjustedScore ?? baseLiveScore(m);
+        const badges = liveRow?.badges || [];
         return `
           <tr onclick="openTraceDrawer('${escapeHtml(encodeURIComponent(item.strategy))}')">
             <td><strong>${escapeHtml(item.strategy)}</strong></td>
+            <td><div class="events">${badges.map(badge => `<span class="badge ${badgeClass(badge)}">${escapeHtml(badge)}</span>`).join('')}</div></td>
+            <td class="${liveScore >= 0 ? 'positive' : 'negative'}">${scoreText(liveScore)}</td>
             <td>${pct(m.avgWinRate)}</td>
             <td class="${m.avgNetPerTrade >= 0 ? 'positive' : 'negative'}">${money(m.avgNetPerTrade)}</td>
             <td>${m.medianTradesToPass.toFixed(0)} / ${m.medianTradesToBlowEval.toFixed(0)}</td>
             <td><span class="positive">${money(m.avgEvalWin)}</span> / <span class="negative">${money(-m.avgEvalLoss)}</span></td>
             <td><span class="badge ${m.passRatePercent >= 50 ? 'good' : 'warn'}">${pct(m.passRatePercent)}</span></td>
+            <td>${m.evalBlown}</td>
+            <td>${m.avgDaysToPass.toFixed(1)}</td>
+            <td>${Number(m.avgProfitFactor || 0).toFixed(2)}</td>
             <td>${m.medianFundedTrades.toFixed(0)}</td>
             <td><span class="positive">${money(m.avgFundedWin)}</span> / <span class="negative">${money(-m.avgFundedLoss)}</span></td>
             <td>${pct(m.payoutRatePercent)}</td>
+            <td>${pct(m.percentAccounts3PlusPayouts)}</td>
+            <td><span class="badge ${m.fundedBlowUpRate <= 40 ? 'good' : m.fundedBlowUpRate <= 65 ? 'warn' : 'bad'}">${pct(m.fundedBlowUpRate)}</span></td>
             <td>${m.avgPayoutsCount.toFixed(1)}</td>
             <td>${money(m.avgSinglePayoutAmount)}</td>
+            <td>${money(m.avgPayoutPerAccount)} / ${money(m.medianPayoutPerAccount)}</td>
+            <td>${money(m.medianMonthlyReturn)}</td>
             <td>${m.maxPayouts}</td>
             <td class="${m.expectedValue >= 0 ? 'positive' : 'negative'}">${money(m.expectedValue)}</td>
             <td>${m.medianMaxConsecutiveLosses.toFixed(1)}</td>
@@ -1354,6 +1484,82 @@
           <span>${escapeHtml(item.strategy)} <span class="muted">EV ${money(item.metrics.expectedValue)}</span></span>
         </label>
       `).join('');
+    }
+
+    async function runLivePortfolio() {
+      if (!state.simulationId || !state.results.length) {
+        document.getElementById('livePortfolioBody').innerHTML = '<tr><td colspan="12" class="negative">Primero ejecuta el simulador para generar estrategias disponibles.</td></tr>';
+        document.getElementById('livePortfolioStatus').textContent = 'Faltan estrategias';
+        return;
+      }
+
+      document.getElementById('livePortfolioStatus').textContent = 'Calculando ranking...';
+      try {
+        const res = await fetch('/api/live/portfolio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            simulationId: state.simulationId,
+            topN: numberOr(document.getElementById('liveTopN').value, 5),
+            diversityWeight: numberOr(document.getElementById('liveDiversityWeight').value, 0.35)
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Live portfolio failed');
+        state.livePortfolio = data;
+        renderLivePortfolio();
+        renderResults();
+      } catch (error) {
+        document.getElementById('livePortfolioBody').innerHTML = `<tr><td colspan="12" class="negative">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById('livePortfolioStatus').textContent = 'Error';
+      }
+    }
+
+    function renderLivePortfolio() {
+      const data = state.livePortfolio;
+      const body = document.getElementById('livePortfolioBody');
+      const nearBody = document.getElementById('liveNearMissBody');
+      if (!data) {
+        document.getElementById('livePortfolioStatus').textContent = state.results.length ? 'Listo para generar' : 'Sin ranking live';
+        body.innerHTML = '<tr><td colspan="12" class="muted">Ejecuta una simulacion y genera el ranking live.</td></tr>';
+        nearBody.innerHTML = '<tr><td colspan="6" class="muted">Sin near misses.</td></tr>';
+        return;
+      }
+
+      document.getElementById('livePortfolioStatus').textContent = `${data.portfolio.length} picks / peso ${Number(data.diversityWeight).toFixed(2)}`;
+      body.innerHTML = data.portfolio.map(row => livePortfolioTableRow(row)).join('');
+      nearBody.innerHTML = data.nearMisses.length
+        ? data.nearMisses.map(row => `
+          <tr onclick="openTraceDrawer('${escapeHtml(encodeURIComponent(row.strategy))}')">
+            <td>${escapeHtml(row.strategy)}</td>
+            <td class="${row.adjustedScore >= 0 ? 'positive' : 'negative'}">${scoreText(row.adjustedScore)}</td>
+            <td>${Number(row.avgCorrelation || 0).toFixed(2)}</td>
+            <td class="${row.metrics.expectedValue >= 0 ? 'positive' : 'negative'}">${money(row.metrics.expectedValue)}</td>
+            <td>${pct(row.metrics.payoutRatePercent)}</td>
+            <td>${(row.reasons || []).map(reason => `<span class="badge phase">${escapeHtml(reason)}</span>`).join(' ')}</td>
+          </tr>
+        `).join('')
+        : '<tr><td colspan="6" class="muted">Sin near misses.</td></tr>';
+    }
+
+    function livePortfolioTableRow(row) {
+      const m = row.metrics;
+      return `
+        <tr onclick="openTraceDrawer('${escapeHtml(encodeURIComponent(row.strategy))}')">
+          <td>${row.rank}</td>
+          <td><strong>${escapeHtml(row.strategy)}</strong></td>
+          <td><div class="events">${(row.badges || []).map(badge => `<span class="badge ${badgeClass(badge)}">${escapeHtml(badge)}</span>`).join('')}</div></td>
+          <td class="${row.adjustedScore >= 0 ? 'positive' : 'negative'}">${scoreText(row.adjustedScore)}</td>
+          <td>${scoreText(row.baseScore)}</td>
+          <td>${Number(row.avgCorrelation || 0).toFixed(2)}</td>
+          <td class="${m.expectedValue >= 0 ? 'positive' : 'negative'}">${money(m.expectedValue)}</td>
+          <td>${pct(m.passRatePercent)}</td>
+          <td>${pct(m.payoutRatePercent)}</td>
+          <td>${pct(m.fundedBlowUpRate)}</td>
+          <td>${Number(m.avgDaysToPass || 0).toFixed(1)}</td>
+          <td>${pct(m.percentAccounts3PlusPayouts)}</td>
+        </tr>
+      `;
     }
 
     async function openTraceDrawer(encodedStrategy) {
@@ -1459,8 +1665,10 @@
     function clearResults() {
       state.results = [];
       state.simulationId = null;
+      state.livePortfolio = null;
       renderResults();
       renderBankrollStrategyOptions();
+      renderLivePortfolio();
       document.getElementById('seedBadge').textContent = 'random';
       document.getElementById('runMeta').textContent = 'Ready';
     }
@@ -1560,6 +1768,7 @@
         folder: document.getElementById('folderSelect').value,
         strategies: selectedStrategies,
         initialBankroll: numberOr(document.getElementById('initialBankroll').value, 0),
+        operatingReserveTarget: numberOr(document.getElementById('operatingReserveTarget').value, numberOr(document.getElementById('initialBankroll').value, 0)),
         maxActiveAccountsPerDay: numberOr(document.getElementById('maxActiveAccounts').value, 3),
         horizonMonths: numberOr(document.getElementById('bankrollMonths').value, 12),
         iterations: numberOr(document.getElementById('bankrollIterations').value, 1000),
@@ -1612,12 +1821,17 @@
       document.getElementById('bankrollMetrics').innerHTML = [
         metric('Risk of ruin', pct(data.riskOfRuinPercent), 'Porcentaje de simulaciones donde el bankroll operativo llego a cero o menos.'),
         metric('Stalled', pct(data.stalledPercent), 'Porcentaje de simulaciones donde no hay cuentas activas y el bankroll no alcanza para comprar otra evaluacion.'),
-        metric('Operating bankroll', money(data.medianOperatingBankroll ?? data.medianFinalBankroll), 'Mediana del capital liquido que queda disponible para comprar nuevas cuentas al final del horizonte.'),
+        metric('Cash balance', money(data.medianOperatingBankroll ?? data.medianFinalBankroll), 'Mediana del efectivo total que queda dentro del sistema al final del horizonte. Puede incluir capital operativo y surplus.'),
+        metric('Operating reserve', money(data.operatingReserveTarget ?? 0), 'Capital objetivo que quieres mantener reservado para seguir comprando cuentas y sostener los slots activos.'),
+        metric('Deployable bankroll', money(data.medianDeployableBankroll ?? data.medianOperatingBankroll ?? data.medianFinalBankroll), 'Parte del cash balance que se considera capital operativo desplegable. Nunca excede la reserva operativa.'),
+        metric('Surplus profit', money(data.medianSurplusProfit || 0), 'Profit mediano fuera de la reserva operativa: efectivo por encima del reserve target mas ganancias retiradas.'),
+        metric('Reserve coverage', pct(data.medianReserveCoveragePercent || 0), 'Porcentaje de la reserva operativa que esta cubierta con cash disponible.'),
         metric('Withdrawn profit', money(data.medianWithdrawnProfit || 0), 'Mediana de la ganancia acumulada retirada del sistema, segun el porcentaje que decidiste no reinvertir.'),
         metric('Total net worth', money(data.medianTotalNetWorth || data.medianFinalBankroll), 'Mediana de bankroll operativo mas ganancia retirada. Mide el valor total del sistema.'),
         metric('Net profit', money(data.medianNetProfit || 0), 'Mediana de ganancia neta contra el bankroll inicial: bankroll operativo final + ganancia retirada - bankroll inicial.'),
         metric('ROI', pct(data.medianROIPercent || 0), 'Retorno mediano sobre el bankroll inicial usando la ganancia neta.'),
         metric('P10 / P90 bankroll', `${money(data.p10OperatingBankroll ?? data.p10FinalBankroll)} / ${money(data.p90OperatingBankroll ?? data.p90FinalBankroll)}`, 'Rango de resultados del bankroll operativo final: P10 es escenario malo y P90 escenario bueno.'),
+        metric('P10 / P90 surplus', `${money(data.p10SurplusProfit || 0)} / ${money(data.p90SurplusProfit || 0)}`, 'Rango de profit surplus: P10 muestra escenario conservador y P90 escenario favorable.'),
         metric('Median max DD', money(data.medianMaxDrawdown), 'Mediana de la peor caida del bankroll operativo desde su punto maximo anterior.'),
         metric('Avg payouts', Number(data.avgPayouts).toFixed(1), 'Cantidad promedio de payouts cobrados por simulacion.'),
         metric('Avg purchased', Number(data.avgAccountsPurchased).toFixed(1), 'Cantidad promedio de evaluaciones compradas por simulacion.'),
@@ -1638,7 +1852,9 @@
       const width = 900;
       const height = 240;
       const chartLabels = {
-        bankroll: 'Bankroll operativo',
+        bankroll: 'Cash balance',
+        deployableBankroll: 'Deployable bankroll',
+        surplusProfit: 'Surplus profit',
         withdrawnProfit: 'Ganancia retirada',
         totalNetWorth: 'Total net worth'
       };
@@ -1648,7 +1864,8 @@
       const span = Math.max(1, max - min);
       const points = curve.map((point, index) => {
         const x = curve.length === 1 ? 0 : (index / (curve.length - 1)) * width;
-        const y = height - ((point.bankroll - min) / span) * (height - 28) - 14;
+        const value = Number(point[mode] ?? point.bankroll);
+        const y = height - ((value - min) / span) * (height - 28) - 14;
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       }).join(' ');
       el.innerHTML = `

@@ -153,3 +153,26 @@ test('bankroll seeded runs are reproducible', () => {
   assert.deepEqual(first.representativeCurves, second.representativeCurves);
   assert.equal(first.medianFinalBankroll, second.medianFinalBankroll);
 });
+
+test('bankroll separates deployable reserve from surplus profit', () => {
+  const result = new BankrollEngine({
+    profile: profile(10),
+    riskProfile: risk,
+    strategies: [{ strategy: 'a.csv', trades: [trade(0, 1), trade(1, 1), trade(2, 1)] }],
+    request: request({
+      initialBankroll: 100,
+      operatingReserveTarget: 100,
+      reinvestmentPercent: 1,
+      horizonMonths: 1
+    })
+  }).run();
+
+  assert.equal(result.operatingReserveTarget, 100);
+  assert.ok(result.medianOperatingBankroll > 100);
+  assert.equal(result.medianDeployableBankroll, 100);
+  assert.ok(result.medianSurplusProfit > 0);
+  assert.equal(result.medianReserveCoveragePercent, 100);
+  const lastPoint = result.representativeCurves[0].curve.at(-1)!;
+  assert.equal(lastPoint.deployableBankroll, Math.min(lastPoint.bankroll, 100));
+  assert.equal(lastPoint.surplusProfit, Math.max(0, lastPoint.bankroll - 100) + lastPoint.withdrawnProfit);
+});
