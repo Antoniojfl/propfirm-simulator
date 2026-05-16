@@ -34,6 +34,11 @@ export interface MonteCarloResults {
   avgPayoutsCount: number;
   avgSinglePayoutAmount: number;
   maxPayouts: number;
+  avgTacticalTrades: number;
+  tacticalWinRateRealized: number;
+  avgTacticalPnL: number;
+  payoutsUnlockedByTactical: number;
+  accountsBlownByTactical: number;
   randomization: {
     mode: 'random' | 'seeded';
     seed: string;
@@ -97,6 +102,11 @@ export class MonteCarloEngine {
     let totalFundedGrossLoss = 0;
     let totalFundedWinningTrades = 0;
     let totalFundedLosingTrades = 0;
+    let totalTacticalTrades = 0;
+    let totalTacticalWins = 0;
+    let totalTacticalPnl = 0;
+    let totalPayoutsUnlockedByTactical = 0;
+    let totalAccountsBlownByTactical = 0;
 
     const fundedLifespans: number[] = [];
     const fundedPayoutAmounts: number[] = [];
@@ -110,7 +120,7 @@ export class MonteCarloEngine {
     for (let i = 0; i < this.iterations; i++) {
       const captureTrace = traces.length < traceCount;
       const resampledTrades = this.resampleTrades(this.createIterationRng(i));
-      const simEngine = new SimulationEngine(this.profile, this.riskProfile, resampledTrades, avgTradesPerDay, captureTrace);
+      const simEngine = new SimulationEngine(this.profile, this.riskProfile, resampledTrades, avgTradesPerDay, captureTrace, this.createTacticalRng(i));
       const { metrics, trace } = simEngine.run();
 
       if (trace && traces.length < traceCount) {
@@ -127,6 +137,11 @@ export class MonteCarloEngine {
       totalEvalGrossLoss += metrics.evalGrossLoss;
       totalEvalWinningTrades += metrics.evalWinningTrades;
       totalEvalLosingTrades += (metrics.evalTrades - metrics.evalWinningTrades);
+      totalTacticalTrades += metrics.tacticalTrades;
+      totalTacticalWins += metrics.tacticalWins;
+      totalTacticalPnl += metrics.tacticalPnl;
+      totalPayoutsUnlockedByTactical += metrics.payoutsUnlockedByTactical;
+      totalAccountsBlownByTactical += metrics.accountsBlownByTactical;
 
       if (metrics.status === 'BLOWN' && metrics.daysToPass === null) {
         evalBlown++;
@@ -204,6 +219,11 @@ export class MonteCarloEngine {
         avgPayoutsCount,
         avgSinglePayoutAmount,
         maxPayouts: maxPayoutsReached,
+        avgTacticalTrades: totalTacticalTrades / this.iterations,
+        tacticalWinRateRealized: totalTacticalTrades > 0 ? (totalTacticalWins / totalTacticalTrades) * 100 : 0,
+        avgTacticalPnL: totalTacticalPnl / this.iterations,
+        payoutsUnlockedByTactical: totalPayoutsUnlockedByTactical,
+        accountsBlownByTactical: totalAccountsBlownByTactical,
         randomization: {
           mode: this.randomization.mode,
           seed: this.effectiveSeed
@@ -218,7 +238,7 @@ export class MonteCarloEngine {
     const traces: SimulationTrace[] = [];
     for (let i = 0; i < count; i++) {
       const resampledTrades = this.resampleTrades(this.createIterationRng(i));
-      const simEngine = new SimulationEngine(this.profile, this.riskProfile, resampledTrades, avgTradesPerDay, true);
+      const simEngine = new SimulationEngine(this.profile, this.riskProfile, resampledTrades, avgTradesPerDay, true, this.createTacticalRng(i));
       const { trace } = simEngine.run();
       if (trace) {
         trace.id = `trace-${i + 1}`;
@@ -243,6 +263,10 @@ export class MonteCarloEngine {
 
   private createIterationRng(iteration: number): Rng {
     return createSeededRng(`${this.effectiveSeed}:${iteration}`);
+  }
+
+  private createTacticalRng(iteration: number): Rng {
+    return createSeededRng(`${this.effectiveSeed}:${iteration}:tactical`);
   }
 
   private resampleTrades(rng: Rng): RawTrade[] {

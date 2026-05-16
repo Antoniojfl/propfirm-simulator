@@ -226,3 +226,126 @@ test('allows micro contracts up to the mini-equivalent profile limit', () => {
   assert.equal(fundedTrade?.executedContracts, 25);
   assert.equal(fundedTrade?.netPnl, 50);
 });
+
+test('funded tactical payout trade unlocks payout on the next day', () => {
+  const profile = baseProfile({
+    evalRules: {
+      maxContracts: 10,
+      profitTarget: { enabled: true, amount: 1 },
+      drawdown: { enabled: true, mode: 'EOD', amount: 1000 },
+      consistency: { enabled: false, maxDailyProfitPercent: 0 },
+      minTradingDays: { enabled: false, days: 0 }
+    },
+    payoutRules: {
+      enabled: true,
+      minTradingDays: 2,
+      minProfitPerDay: 150,
+      minPayoutAmount: 300,
+      maxPayoutAmount: 300,
+      payoutPercent: 1,
+      payoutSplit: 1,
+      positiveCycleProfitRequired: true,
+      deductPayout: true,
+      resetCycleAfterPayout: true
+    }
+  });
+  const tacticalRisk: RiskProfile = {
+    ...risk,
+    useFundedTacticalPayoutTrade: true,
+    tacticalPayoutWinRate: 1,
+    tacticalPayoutRiskReward: 4
+  };
+  const result = new SimulationEngine(profile, tacticalRisk, [trade(0, 1), trade(1, 150), trade(2, 999)], 1, true).run();
+  const synthetic = result.trace?.trades.find(item => item.isSynthetic);
+  const events = result.trace?.trades.flatMap(item => item.events.map(event => event.type)) || [];
+
+  assert.equal(result.metrics.payoutsTaken, 1);
+  assert.equal(result.metrics.tacticalTrades, 1);
+  assert.equal(result.metrics.tacticalWins, 1);
+  assert.equal(result.metrics.payoutsUnlockedByTactical, 1);
+  assert.equal(synthetic?.netPnl, 150);
+  assert.equal(synthetic?.rewardAmount, 150);
+  assert.equal(synthetic?.riskAmount, 600);
+  assert.ok(events.includes('TACTICAL_PAYOUT_TRADE_SCHEDULED'));
+  assert.ok(events.includes('TACTICAL_PAYOUT_TRADE_WON'));
+  assert.ok(events.includes('TACTICAL_PAYOUT_UNLOCKED'));
+});
+
+test('funded tactical payout trade does not run unless winning unlocks payout', () => {
+  const profile = baseProfile({
+    evalRules: {
+      maxContracts: 10,
+      profitTarget: { enabled: true, amount: 1 },
+      drawdown: { enabled: true, mode: 'EOD', amount: 1000 },
+      consistency: { enabled: false, maxDailyProfitPercent: 0 },
+      minTradingDays: { enabled: false, days: 0 }
+    },
+    payoutRules: {
+      enabled: true,
+      minTradingDays: 3,
+      minProfitPerDay: 150,
+      minPayoutAmount: 300,
+      maxPayoutAmount: 300,
+      payoutPercent: 1,
+      payoutSplit: 1,
+      positiveCycleProfitRequired: true,
+      deductPayout: true,
+      resetCycleAfterPayout: true
+    }
+  });
+  const tacticalRisk: RiskProfile = {
+    ...risk,
+    useFundedTacticalPayoutTrade: true,
+    tacticalPayoutWinRate: 1,
+    tacticalPayoutRiskReward: 4
+  };
+  const result = new SimulationEngine(profile, tacticalRisk, [trade(0, 1), trade(1, 150), trade(2, 999)], 1, true).run();
+
+  assert.equal(result.metrics.tacticalTrades, 0);
+  assert.equal(result.trace?.trades.some(item => item.isSynthetic), false);
+});
+
+test('losing funded tactical payout trade can blow the account', () => {
+  const profile = baseProfile({
+    evalRules: {
+      maxContracts: 10,
+      profitTarget: { enabled: true, amount: 1 },
+      drawdown: { enabled: true, mode: 'EOD', amount: 1000 },
+      consistency: { enabled: false, maxDailyProfitPercent: 0 },
+      minTradingDays: { enabled: false, days: 0 }
+    },
+    fundedRules: {
+      maxContracts: 10,
+      drawdown: { enabled: true, mode: 'EOD', amount: 500 },
+      consistency: { enabled: false, maxDailyProfitPercent: 0 },
+      minTradingDays: { enabled: false, days: 0 }
+    },
+    payoutRules: {
+      enabled: true,
+      minTradingDays: 2,
+      minProfitPerDay: 200,
+      minPayoutAmount: 400,
+      maxPayoutAmount: 400,
+      payoutPercent: 1,
+      payoutSplit: 1,
+      positiveCycleProfitRequired: true,
+      deductPayout: true,
+      resetCycleAfterPayout: true
+    }
+  });
+  const tacticalRisk: RiskProfile = {
+    ...risk,
+    useFundedTacticalPayoutTrade: true,
+    tacticalPayoutWinRate: 0,
+    tacticalPayoutRiskReward: 4
+  };
+  const result = new SimulationEngine(profile, tacticalRisk, [trade(0, 1), trade(1, 200), trade(2, 999)], 1, true).run();
+  const synthetic = result.trace?.trades.find(item => item.isSynthetic);
+
+  assert.equal(result.metrics.status, 'BLOWN');
+  assert.equal(result.metrics.tacticalTrades, 1);
+  assert.equal(result.metrics.accountsBlownByTactical, 1);
+  assert.equal(synthetic?.netPnl, -800);
+  assert.ok(synthetic?.events.some(event => event.type === 'TACTICAL_PAYOUT_TRADE_LOST'));
+  assert.ok(synthetic?.events.some(event => event.type === 'ACCOUNT_BLOWN'));
+});

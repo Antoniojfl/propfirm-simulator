@@ -1,4 +1,4 @@
-import { PropFirmProfile, RandomizationConfig, RiskProfile, SimulationTrace, TraceEventType } from '../types';
+import { PropFirmProfile, RandomizationConfig, RiskProfile, SimulationTrace, TraceEventType, TradeSanitizationConfig } from '../types';
 import { RawTrade } from '../tradeParser';
 
 export interface BankrollStrategyInput {
@@ -18,6 +18,7 @@ export interface BankrollRequest {
   reinvestmentPercent: number;
   operatingReserveTarget?: number;
   randomization?: RandomizationConfig;
+  sanitization?: TradeSanitizationConfig;
 }
 
 export interface BankrollEngineInput {

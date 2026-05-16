@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { TradeParser } from './tradeParser';
 import { MonteCarloEngine } from './monteCarloEngine';
-import { PropFirmProfile, RandomizationConfig, RiskProfile } from './types';
+import { PropFirmProfile, RandomizationConfig, RiskProfile, TradeSanitizationConfig } from './types';
 import { ProfileStore, ProfileValidationError } from './profileStore';
 import { createRunSeed } from './random';
 import { normalizeInstrument, pointValueForInstrument } from './instruments';
@@ -17,6 +17,7 @@ import { MonteCarloResults } from './monteCarloEngine';
 import { DailyPnlPoint } from './live/types';
 import { buildDailyPointSeries } from './live/dailySeries';
 import { buildLivePortfolio } from './live/portfolioSelector';
+import { normalizeSanitizationConfig, sanitizeTrades, TradeSanitizationReport } from './tradeSanitizer';
 
 interface SimulationResultCache {
   strategy: string;
@@ -30,6 +31,7 @@ interface SimulationSession {
   folder: string;
   riskProfile: RiskProfile;
   randomization: RandomizationConfig;
+  sanitization: Required<TradeSanitizationConfig>;
   effectiveSeed: string;
   results: SimulationResultCache[];
   createdAt: number;
@@ -176,14 +178,14 @@ app.post('/api/jobs/:id/cancel', (req, res) => {
 });
 
 app.post('/api/simulate', async (req, res) => {
-  const { profileId, folder, riskConfig, randomization } = req.body;
+  const { profileId, folder, riskConfig, randomization, sanitization } = req.body;
   if (!profileId || !folder) {
     return res.status(400).json({ error: 'Invalid payload' });
   }
 
   const job = createJob('simulation');
   res.status(202).json({ jobId: job.id });
-  void runSimulationJob(job, { profileId, folder, riskConfig, randomization });
+  void runSimulationJob(job, { profileId, folder, riskConfig, randomization, sanitization });
 });
 
 app.post('/api/optimize', async (req, res) => {
@@ -237,7 +239,7 @@ app.get('/api/simulations/:id/strategies/:strategy/traces', async (req, res) => 
       return res.status(404).json({ error: 'Strategy file not found' });
     }
 
-    const trades = await TradeParser.parseSqxCsv(csvPath);
+    const { trades } = sanitizeTrades(await TradeParser.parseSqxCsv(csvPath), session.sanitization);
     const strategySeed = `${session.effectiveSeed}:${safeStrategy}`;
     const engine = new MonteCarloEngine(profile, session.riskProfile, trades, 5, {
       ...session.randomization,
@@ -258,12 +260,14 @@ async function runSimulationJob(job: JobRecord, input: {
   folder: string;
   riskConfig: any;
   randomization: any;
+  sanitization: any;
 }) {
   try {
     markJobRunning(job, 'Preparando simulacion...');
     const profile = profileStore.read(input.profileId);
     const riskProfile = buildRiskProfile(input.riskConfig);
     const randomizationConfig = buildRandomization(input.randomization);
+    const sanitizationConfig = normalizeSanitizationConfig(input.sanitization);
     const sessionId = `sim-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const effectiveSeed = createRunSeed(randomizationConfig.seed);
     const targetDir = resolveStrategyFolder(input.folder);
@@ -274,12 +278,14 @@ async function runSimulationJob(job: JobRecord, input: {
     }
 
     const results: SimulationResultCache[] = [];
+    const sanitizationReports: Array<{ strategy: string; report: TradeSanitizationReport }> = [];
     updateJobProgress(job, 0, files.length, `0/${files.length} estrategias`);
 
     for (const [index, strategyFile] of files.entries()) {
       throwIfCancelled(job);
       updateJobProgress(job, index, files.length, `Leyendo ${strategyFile}`);
-      const trades = await TradeParser.parseSqxCsv(path.join(targetDir, strategyFile));
+      const parsedTrades = await TradeParser.parseSqxCsv(path.join(targetDir, strategyFile));
+      const { trades, report } = sanitizeTrades(parsedTrades, sanitizationConfig);
       const strategySeed = `${effectiveSeed}:${strategyFile}`;
       const engine = new MonteCarloEngine(profile, riskProfile, trades, 1000, {
         ...randomizationConfig,
@@ -291,6 +297,7 @@ async function runSimulationJob(job: JobRecord, input: {
         metrics,
         dailySeries: buildDailyPointSeries(trades)
       });
+      sanitizationReports.push({ strategy: strategyFile, report });
       updateJobProgress(job, index + 1, files.length, `${index + 1}/${files.length} estrategias`);
       await yieldToEventLoop();
     }
@@ -301,6 +308,7 @@ async function runSimulationJob(job: JobRecord, input: {
       folder: input.folder,
       riskProfile,
       randomization: randomizationConfig,
+      sanitization: sanitizationConfig,
       effectiveSeed,
       results,
       createdAt: Date.now()
@@ -311,6 +319,10 @@ async function runSimulationJob(job: JobRecord, input: {
       randomization: {
         mode: randomizationConfig.mode,
         seed: effectiveSeed
+      },
+      sanitization: {
+        config: sanitizationConfig,
+        reports: sanitizationReports
       },
       results: results.map(({ strategy, metrics }) => ({ strategy, metrics }))
     });
@@ -338,7 +350,7 @@ async function runOptimizerJob(job: JobRecord, body: OptimizerRequest & { profil
       throwIfCancelled(job);
       strategies.push({
         strategy: strategyFile,
-        trades: await TradeParser.parseSqxCsv(path.join(targetDir, strategyFile))
+        trades: sanitizeTrades(await TradeParser.parseSqxCsv(path.join(targetDir, strategyFile)), body.sanitization).trades
       });
       updateJobProgress(job, index + 1, files.length, `Leyendo ${index + 1}/${files.length}`);
       await yieldToEventLoop();
@@ -413,7 +425,7 @@ async function runBankrollJob(job: JobRecord, body: BankrollRequest) {
       throwIfCancelled(job);
       strategies.push({
         strategy: strategyFile,
-        trades: await TradeParser.parseSqxCsv(path.join(targetDir, strategyFile))
+        trades: sanitizeTrades(await TradeParser.parseSqxCsv(path.join(targetDir, strategyFile)), body.sanitization).trades
       });
       updateJobProgress(job, index + 1, files.length, `Leyendo ${index + 1}/${files.length}`);
       await yieldToEventLoop();
@@ -552,7 +564,10 @@ function buildRiskProfile(riskConfig: any): RiskProfile {
       pointValue: Number(riskConfig?.fundedPostPayout?.pointValue ?? pointValueForInstrument(fundedPostInstrument))
     },
     commissions: riskConfig?.commissions !== undefined ? Number(riskConfig.commissions) : 4.0,
-    useSmartScaling: riskConfig?.useSmartScaling !== undefined ? Boolean(riskConfig.useSmartScaling) : true
+    useSmartScaling: riskConfig?.useSmartScaling !== undefined ? Boolean(riskConfig.useSmartScaling) : true,
+    useFundedTacticalPayoutTrade: riskConfig?.useFundedTacticalPayoutTrade !== undefined ? Boolean(riskConfig.useFundedTacticalPayoutTrade) : false,
+    tacticalPayoutWinRate: riskConfig?.tacticalPayoutWinRate !== undefined ? Number(riskConfig.tacticalPayoutWinRate) : 0.7,
+    tacticalPayoutRiskReward: riskConfig?.tacticalPayoutRiskReward !== undefined ? Number(riskConfig.tacticalPayoutRiskReward) : 4
   };
 }
 

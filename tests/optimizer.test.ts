@@ -158,6 +158,11 @@ function metric(overrides: Partial<MonteCarloResults>): MonteCarloResults {
     avgPayoutsCount: 0,
     avgSinglePayoutAmount: 0,
     maxPayouts: 0,
+    avgTacticalTrades: 0,
+    tacticalWinRateRealized: 0,
+    avgTacticalPnL: 0,
+    payoutsUnlockedByTactical: 0,
+    accountsBlownByTactical: 0,
     randomization: { mode: 'seeded', seed: 'x' },
     ...overrides
   };

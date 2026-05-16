@@ -14,6 +14,7 @@ import {
 } from './types';
 import { RawTrade } from './tradeParser';
 import { contractLimitForRules, getPhaseRiskConfig, maxMiniContractsForRules, normalizeRiskProfile } from './instruments';
+import { createSeededRng, Rng } from './random';
 
 interface PhaseStats {
   trades: number;
@@ -44,11 +45,24 @@ interface RuntimeAccount {
   maxConsecutiveLosses: number;
   winningPointSum: number;
   winningPointTrades: number;
+  pendingTacticalTrade: TacticalPayoutTrade | null;
+  lastTacticalUnlock: boolean;
+  tacticalTrades: number;
+  tacticalWins: number;
+  tacticalPnl: number;
+  payoutsUnlockedByTactical: number;
+  accountsBlownByTactical: number;
 }
 
 interface ProcessResult {
   continuePhase: boolean;
   traceTrade?: TraceTrade;
+}
+
+interface TacticalPayoutTrade {
+  reward: number;
+  risk: number;
+  winProbability: number;
 }
 
 export class SimulationEngine {
@@ -57,6 +71,8 @@ export class SimulationEngine {
   private rawTrades: RawTrade[];
   private avgTradesPerDay: number;
   private captureTrace: boolean;
+  private tacticalRng: Rng;
+  private currentTradeIsTactical = false;
   private traceTrades: TraceTrade[] = [];
   private globalTradeIndex = 0;
 
@@ -65,13 +81,15 @@ export class SimulationEngine {
     riskProfile: RiskProfile,
     rawTrades: RawTrade[],
     avgTradesPerDay: number = 1,
-    captureTrace: boolean = false
+    captureTrace: boolean = false,
+    tacticalRng: Rng = createSeededRng('simulation-tactical-default')
   ) {
     this.profile = profile;
     this.riskProfile = normalizeRiskProfile(riskProfile);
     this.rawTrades = rawTrades;
     this.avgTradesPerDay = avgTradesPerDay;
     this.captureTrace = captureTrace;
+    this.tacticalRng = tacticalRng;
   }
 
   public runSingleSimulation(): AccountMetrics {
@@ -97,6 +115,11 @@ export class SimulationEngine {
     fundedAccount.state = 'FUNDED';
 
     while (tradeIndex < this.rawTrades.length && fundedAccount.state === 'FUNDED') {
+      if (fundedAccount.pendingTacticalTrade) {
+        this.processTacticalPayoutTrade(fundedAccount, this.rawTrades[tradeIndex]);
+        tradeIndex++;
+        continue;
+      }
       this.processTrade(fundedAccount, this.profile.fundedRules, this.rawTrades[tradeIndex]);
       tradeIndex++;
     }
@@ -135,7 +158,14 @@ export class SimulationEngine {
       maxConsecutiveLosses: 0
       ,
       winningPointSum: 0,
-      winningPointTrades: 0
+      winningPointTrades: 0,
+      pendingTacticalTrade: null,
+      lastTacticalUnlock: false,
+      tacticalTrades: 0,
+      tacticalWins: 0,
+      tacticalPnl: 0,
+      payoutsUnlockedByTactical: 0,
+      accountsBlownByTactical: 0
     };
   }
 
@@ -204,6 +234,7 @@ export class SimulationEngine {
         this.checkEvaluationRules(account, rules, events);
       } else if (account.phase === 'funded' && account.state === 'FUNDED') {
         this.checkPayoutRules(account, events);
+        this.maybeScheduleTacticalPayoutTrade(account, events);
       }
     }
 
@@ -224,6 +255,104 @@ export class SimulationEngine {
     }
 
     return { continuePhase: account.state === 'EVALUATION' || account.state === 'FUNDED', traceTrade };
+  }
+
+  private processTacticalPayoutTrade(account: RuntimeAccount, rawTrade: RawTrade): ProcessResult {
+    const tactical = account.pendingTacticalTrade;
+    if (!tactical || account.state !== 'FUNDED') return { continuePhase: account.state === 'FUNDED' };
+
+    account.pendingTacticalTrade = null;
+    account.lastTacticalUnlock = false;
+    const day = rawTrade.closeTime.toISOString().split('T')[0];
+    const events: TraceEvent[] = [];
+    const balanceBefore = account.balance;
+    const won = this.tacticalRng() < tactical.winProbability;
+    const netPnl = won ? tactical.reward : -tactical.risk;
+    const grossPnl = netPnl;
+    const phaseRisk = getPhaseRiskConfig(this.riskProfile, 'funded', account.payoutsTaken);
+
+    account.balance += netPnl;
+    account.currentDay = day;
+    account.phaseStats.trades++;
+    account.tradingDays.add(day);
+    account.tacticalTrades++;
+    account.tacticalPnl += netPnl;
+    this.globalTradeIndex++;
+
+    account.dailyPnL[day] = (account.dailyPnL[day] || 0) + netPnl;
+    account.payoutCycleDailyPnL[day] = (account.payoutCycleDailyPnL[day] || 0) + netPnl;
+
+    if (netPnl > 0) {
+      account.phaseStats.grossWin += netPnl;
+      account.phaseStats.winningTrades++;
+      account.tacticalWins++;
+      account.currentConsecutiveLosses = 0;
+      events.push({
+        type: 'TACTICAL_PAYOUT_TRADE_WON',
+        message: `Tactical payout trade won ${this.money(tactical.reward)}`,
+        value: tactical.reward
+      });
+    } else {
+      account.phaseStats.grossLoss += Math.abs(netPnl);
+      account.currentConsecutiveLosses++;
+      account.maxConsecutiveLosses = Math.max(account.maxConsecutiveLosses, account.currentConsecutiveLosses);
+      events.push({
+        type: 'TACTICAL_PAYOUT_TRADE_LOST',
+        message: `Tactical payout trade lost ${this.money(tactical.risk)}`,
+        value: -tactical.risk
+      });
+    }
+
+    const minProfit = this.profile.payoutRules.minProfitPerDay;
+    if (minProfit === undefined || (account.payoutCycleDailyPnL[day] || 0) >= minProfit) {
+      account.qualifyingPayoutDays.add(day);
+    }
+
+    if (this.profile.fundedRules.drawdown.enabled && this.isDrawdownBreached(account)) {
+      account.state = 'BLOWN';
+      account.blownReason = `Hit ${this.profile.fundedRules.drawdown.mode} drawdown level ${this.money(account.drawdownLevel)}`;
+      account.accountsBlownByTactical++;
+      events.push({
+        type: 'ACCOUNT_BLOWN',
+        message: account.blownReason,
+        value: account.drawdownLevel
+      });
+    } else {
+      this.updateDrawdown(account, this.profile.fundedRules.drawdown, events);
+      if (account.state === 'FUNDED') {
+        this.currentTradeIsTactical = true;
+        this.checkPayoutRules(account, events);
+        this.currentTradeIsTactical = false;
+        if (account.lastTacticalUnlock) {
+          events.push({
+            type: 'TACTICAL_PAYOUT_UNLOCKED',
+            message: 'Tactical payout trade unlocked a payout',
+            value: account.totalPayoutAmount
+          });
+        }
+      }
+    }
+
+    const traceTrade = this.captureTrace ? this.toTraceTrade(account, rawTrade, {
+      balanceBefore,
+      grossPnl,
+      netPnl,
+      contracts: 0,
+      requestedContracts: 0,
+      instrument: phaseRisk.instrument,
+      pointValue: phaseRisk.pointValue,
+      day,
+      events,
+      isSynthetic: true,
+      syntheticType: 'TACTICAL_PAYOUT',
+      winProbability: tactical.winProbability,
+      rewardAmount: tactical.reward,
+      riskAmount: tactical.risk,
+      netPoints: 0
+    }) : undefined;
+
+    if (traceTrade) this.traceTrades.push(traceTrade);
+    return { continuePhase: account.state === 'FUNDED', traceTrade };
   }
 
   private checkEvaluationRules(account: RuntimeAccount, rules: PhaseRules, events: TraceEvent[]) {
@@ -303,6 +432,10 @@ export class SimulationEngine {
     }
     account.payoutsTaken++;
     account.totalPayoutAmount += traderPayout;
+    if (this.currentTradeIsTactical) {
+      account.lastTacticalUnlock = true;
+      account.payoutsUnlockedByTactical++;
+    }
     events.push({
       type: 'PAYOUT_TAKEN',
       message: `Payout taken: ${this.money(traderPayout)} trader net`,
@@ -333,6 +466,77 @@ export class SimulationEngine {
     const cap = payout.payoutCaps?.[account.payoutsTaken] ?? payout.maxPayoutAmount ?? withdrawableAboveFloor;
     const percentAmount = payout.payoutPercent ? Math.max(cycleProfit, 0) * payout.payoutPercent : cap;
     return Math.max(0, Math.min(cap, percentAmount, withdrawableAboveFloor));
+  }
+
+  private maybeScheduleTacticalPayoutTrade(account: RuntimeAccount, events: TraceEvent[]) {
+    if (!this.riskProfile.useFundedTacticalPayoutTrade || account.pendingTacticalTrade || account.phase !== 'funded' || account.state !== 'FUNDED') return;
+    const payout = this.profile.payoutRules;
+    if (!payout.enabled || !payout.minProfitPerDay) return;
+    const tactical = this.buildTacticalPayoutTrade(account);
+    if (!tactical) return;
+    account.pendingTacticalTrade = tactical;
+    events.push({
+      type: 'TACTICAL_PAYOUT_TRADE_SCHEDULED',
+      message: `Tactical payout trade scheduled for next day: win ${this.money(tactical.reward)} / risk ${this.money(tactical.risk)}`,
+      value: tactical.reward
+    });
+  }
+
+  private buildTacticalPayoutTrade(account: RuntimeAccount): TacticalPayoutTrade | null {
+    const payout = this.profile.payoutRules;
+    const minProfitPerDay = payout.minProfitPerDay;
+    if (!minProfitPerDay) return null;
+
+    const currentCycleProfit = account.balance - account.payoutCycleStartBalance;
+    const balanceFloor = payout.safetyNetBalance ?? (payout.reserveAmount ? this.profile.account_size + payout.reserveAmount : undefined);
+    const currentWithdrawable = balanceFloor ? account.balance - balanceFloor : currentCycleProfit;
+    const payoutPercent = payout.payoutPercent ?? 1;
+    const payoutGap = Math.max(0, payout.minPayoutAmount - currentWithdrawable);
+    const percentGap = payoutPercent > 0 ? Math.max(0, (payout.minPayoutAmount / payoutPercent) - currentCycleProfit) : 0;
+    const reward = Math.max(minProfitPerDay, payoutGap, percentGap);
+    if (!Number.isFinite(reward) || reward <= 0) return null;
+    if (!this.wouldTacticalWinUnlockPayout(account, reward)) return null;
+
+    const winProbability = Math.max(0, Math.min(1, Number(this.riskProfile.tacticalPayoutWinRate ?? 0.7)));
+    const riskReward = Math.max(0, Number(this.riskProfile.tacticalPayoutRiskReward ?? 4));
+    return {
+      reward,
+      risk: reward * riskReward,
+      winProbability
+    };
+  }
+
+  private wouldTacticalWinUnlockPayout(account: RuntimeAccount, reward: number): boolean {
+    const payout = this.profile.payoutRules;
+    const futureQualifyingDays = account.qualifyingPayoutDays.size + 1;
+    if (payout.minTradingDays && futureQualifyingDays < payout.minTradingDays) return false;
+
+    const futureBalance = account.balance + reward;
+    const futureCycleProfit = futureBalance - account.payoutCycleStartBalance;
+    if (payout.positiveCycleProfitRequired && futureCycleProfit <= 0) return false;
+
+    const balanceFloor = payout.safetyNetBalance ?? (payout.reserveAmount ? this.profile.account_size + payout.reserveAmount : undefined);
+    const withdrawableAboveFloor = balanceFloor ? futureBalance - balanceFloor : futureCycleProfit;
+    if (withdrawableAboveFloor < payout.minPayoutAmount) return false;
+
+    if (this.isConsistencyBlockedAfterTactical(account, payout, reward, Math.max(futureCycleProfit, withdrawableAboveFloor))) return false;
+
+    const payoutAmount = this.calculateProjectedPayoutAmount(account.payoutsTaken, payout, withdrawableAboveFloor, futureCycleProfit);
+    return payoutAmount >= payout.minPayoutAmount;
+  }
+
+  private calculateProjectedPayoutAmount(payoutsTaken: number, payout: PayoutRules, withdrawableAboveFloor: number, cycleProfit: number): number {
+    const cap = payout.payoutCaps?.[payoutsTaken] ?? payout.maxPayoutAmount ?? withdrawableAboveFloor;
+    const percentAmount = payout.payoutPercent ? Math.max(cycleProfit, 0) * payout.payoutPercent : cap;
+    return Math.max(0, Math.min(cap, percentAmount, withdrawableAboveFloor));
+  }
+
+  private isConsistencyBlockedAfterTactical(account: RuntimeAccount, payout: PayoutRules, reward: number, totalProfit: number): boolean {
+    if (!payout.consistency?.enabled) return false;
+    return this.isConsistencyBlocked(account, payout.consistency, {
+      ...account.payoutCycleDailyPnL,
+      __TACTICAL_NEXT_DAY__: reward
+    }, totalProfit);
   }
 
   private isConsistencyBlocked(
@@ -461,7 +665,12 @@ export class SimulationEngine {
       evalWinningTrades: evalStats.winningTrades,
       fundedGrossWin: fundedStats.grossWin,
       fundedGrossLoss: fundedStats.grossLoss,
-      fundedWinningTrades: fundedStats.winningTrades
+      fundedWinningTrades: fundedStats.winningTrades,
+      tacticalTrades: fundedAccount?.tacticalTrades || 0,
+      tacticalWins: fundedAccount?.tacticalWins || 0,
+      tacticalPnl: fundedAccount?.tacticalPnl || 0,
+      payoutsUnlockedByTactical: fundedAccount?.payoutsUnlockedByTactical || 0,
+      accountsBlownByTactical: fundedAccount?.accountsBlownByTactical || 0
     };
   }
 
@@ -498,6 +707,12 @@ export class SimulationEngine {
       pointValue: number;
       day: string;
       events: TraceEvent[];
+      isSynthetic?: boolean;
+      syntheticType?: TraceTrade['syntheticType'];
+      winProbability?: number;
+      rewardAmount?: number;
+      riskAmount?: number;
+      netPoints?: number;
     }
   ): TraceTrade {
     return {
@@ -507,7 +722,7 @@ export class SimulationEngine {
       symbol: rawTrade.symbol,
       instrument: data.instrument,
       closeTime: rawTrade.closeTime.toISOString(),
-      netPoints: rawTrade.netPoints,
+      netPoints: data.netPoints ?? rawTrade.netPoints,
       contracts: data.contracts,
       requestedContracts: data.requestedContracts,
       executedContracts: data.contracts,
@@ -519,7 +734,12 @@ export class SimulationEngine {
       highWaterMark: account.highWaterMark,
       drawdownLevel: account.drawdownLevel,
       cycleProfit: account.balance - account.payoutCycleStartBalance,
-      events: data.events
+      events: data.events,
+      isSynthetic: data.isSynthetic,
+      syntheticType: data.syntheticType,
+      winProbability: data.winProbability,
+      rewardAmount: data.rewardAmount,
+      riskAmount: data.riskAmount
     };
   }
 

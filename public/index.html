@@ -543,6 +543,21 @@
               <label for="seedInput">Seed</label>
               <input id="seedInput" value="lucid-lot1-v1">
             </div>
+            <div class="field">
+              <label for="sanitizationMode">Calidad de trades</label>
+              <select id="sanitizationMode" onchange="toggleSanitizationFields()">
+                <option value="raw">Raw</option>
+                <option value="fixedOutcome" selected>Fixed Outcome</option>
+              </select>
+            </div>
+            <div class="field" id="fixedWinField">
+              <label for="fixedMaxWin">TP pts</label>
+              <input id="fixedMaxWin" type="number" value="82.5" min="0" step="0.1">
+            </div>
+            <div class="field" id="fixedLossField">
+              <label for="fixedMaxLoss">SL pts</label>
+              <input id="fixedMaxLoss" type="number" value="82.5" min="0" step="0.1">
+            </div>
           </div>
 
           <div class="rule-row">
@@ -551,6 +566,24 @@
               <div class="status">Eval de-risk cerca del target</div>
             </div>
             <input id="smartScaling" type="checkbox" checked>
+          </div>
+
+          <div class="rule-row">
+            <div>
+              <strong>Trade tactico payout</strong>
+              <div class="status">Solo funded: comodin para desbloquear payout al siguiente dia</div>
+            </div>
+            <input id="tacticalPayoutTrade" type="checkbox">
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label for="tacticalWinRate">Win rate tactico %</label>
+              <input id="tacticalWinRate" type="number" value="70" min="0" max="100" step="1">
+            </div>
+            <div class="field">
+              <label for="tacticalRiskReward">Risk multiple</label>
+              <input id="tacticalRiskReward" type="number" value="4" min="0" step="0.5">
+            </div>
           </div>
 
           <div class="toolbar" style="margin-top: 1rem;">
@@ -772,6 +805,9 @@
                 <th title="Monto promedio de cada payout individual cobrado por el trader.">Avg Payout</th>
                 <th title="Payout promedio por evaluacion comprada / payout mediano entre cuentas que cobraron.">Avg/Med Acct</th>
                 <th title="Retorno mensual mediano estimado usando payout mediano y vida funded mediana.">Monthly</th>
+                <th title="Promedio de trades tacticos funded usados por iteracion.">Tactical #</th>
+                <th title="Cantidad de payouts desbloqueados por trades tacticos.">Tactical Unlock</th>
+                <th title="Cantidad de cuentas quemadas por trades tacticos.">Tactical Blown</th>
                 <th title="Maximo numero de payouts alcanzado en alguna iteracion Monte Carlo.">Max</th>
                 <th title="Expected Value: payout promedio por evaluacion comprada menos el costo del perfil.">EV</th>
                 <th title="Mediana de la maxima racha de perdidas consecutivas observada por iteracion.">MCL</th>
@@ -779,7 +815,7 @@
               </tr>
             </thead>
             <tbody id="resultsBody">
-              <tr><td colspan="24" class="muted">Ejecuta una simulacion para ver resultados.</td></tr>
+              <tr><td colspan="27" class="muted">Ejecuta una simulacion para ver resultados.</td></tr>
             </tbody>
           </table>
         </div>
@@ -944,6 +980,7 @@
       optimizerResults: [],
       bankrollResults: null,
       livePortfolio: null,
+      sanitization: null,
       currentJobs: {
         simulation: null,
         optimizer: null,
@@ -991,6 +1028,23 @@
         || state.livePortfolio?.nearMisses?.find(row => row.strategy === strategy);
     }
 
+    function renderSanitizationStatus(sanitization) {
+      if (!sanitization?.config) return;
+      document.getElementById('resultsStatus').textContent = sanitizationLabel(sanitization);
+    }
+
+    function sanitizationLabel(sanitization) {
+      if (!sanitization?.config) return '';
+      const config = sanitization.config;
+      const reports = sanitization.reports || [];
+      const adjusted = reports.reduce((sum, item) => sum + Number(item.report?.adjustedTrades || 0), 0);
+      const total = reports.reduce((sum, item) => sum + Number(item.report?.totalTrades || 0), 0);
+      if (config.mode === 'fixedOutcome') {
+        return `Fixed Outcome TP/SL ${config.maxWinPoints}/${config.maxLossPoints} pts: ${adjusted}/${total} trades normalizados`;
+      }
+      return 'Raw trades';
+    }
+
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, char => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
@@ -1008,6 +1062,7 @@
       renderFolderSelect();
       selectProfile(state.profiles[0]?.id);
       toggleSeedInput();
+      toggleSanitizationFields();
       document.getElementById('initialBankroll').addEventListener('input', event => {
         const reserve = document.getElementById('operatingReserveTarget');
         if (!reserve.dataset.touched) reserve.value = event.target.value;
@@ -1302,6 +1357,22 @@
       document.getElementById('seedField').classList.toggle('hidden', document.getElementById('randomMode').value !== 'seeded');
     }
 
+    function toggleSanitizationFields() {
+      const mode = document.getElementById('sanitizationMode').value;
+      const fixedOutcome = mode === 'fixedOutcome';
+      document.getElementById('fixedWinField').classList.toggle('hidden', !fixedOutcome);
+      document.getElementById('fixedLossField').classList.toggle('hidden', !fixedOutcome);
+    }
+
+    function sanitizationFromControls() {
+      const mode = document.getElementById('sanitizationMode').value;
+      return {
+        mode,
+        maxWinPoints: numberOr(document.getElementById('fixedMaxWin').value, 82.5),
+        maxLossPoints: numberOr(document.getElementById('fixedMaxLoss').value, 82.5)
+      };
+    }
+
     function pointValueForInstrument(value) {
       return { NQ: 20, MNQ: 2, ES: 50, MES: 5 }[value] || 20;
     }
@@ -1384,12 +1455,16 @@
           evaluation: phaseRiskFromControls('evalInstrument', 'evalContracts'),
           fundedPrePayout: phaseRiskFromControls('fundedPreInstrument', 'preContracts'),
           fundedPostPayout: phaseRiskFromControls('fundedPostInstrument', 'postContracts'),
-          useSmartScaling: document.getElementById('smartScaling').checked
+          useSmartScaling: document.getElementById('smartScaling').checked,
+          useFundedTacticalPayoutTrade: document.getElementById('tacticalPayoutTrade').checked,
+          tacticalPayoutWinRate: numberOr(document.getElementById('tacticalWinRate').value, 70) / 100,
+          tacticalPayoutRiskReward: numberOr(document.getElementById('tacticalRiskReward').value, 4)
         },
         randomization: {
           mode,
           seed: mode === 'seeded' ? document.getElementById('seedInput').value : undefined
-        }
+        },
+        sanitization: sanitizationFromControls()
       };
 
       setJobControls('simulation', true);
@@ -1409,16 +1484,18 @@
         const data = await pollJob('simulation', start.jobId);
         state.simulationId = data.simulationId;
         state.randomization = data.randomization;
+        state.sanitization = data.sanitization;
         state.livePortfolio = null;
         state.results = data.results.sort((a, b) => b.metrics.expectedValue - a.metrics.expectedValue);
         document.getElementById('seedBadge').textContent = `${data.randomization.mode}: ${data.randomization.seed}`;
+        renderSanitizationStatus(data.sanitization);
         document.getElementById('instrumentBadge').textContent = `Eval ${document.getElementById('evalInstrument').value} / Funded ${document.getElementById('fundedPreInstrument').value}-${document.getElementById('fundedPostInstrument').value}`;
         document.getElementById('runMeta').textContent = `${data.results.length} estrategias`;
         renderResults();
         renderBankrollStrategyOptions();
         renderLivePortfolio();
       } catch (error) {
-        document.getElementById('resultsBody').innerHTML = `<tr><td colspan="24" class="negative">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById('resultsBody').innerHTML = `<tr><td colspan="27" class="negative">${escapeHtml(error.message)}</td></tr>`;
         document.getElementById('resultsStatus').textContent = error.message;
       } finally {
         state.currentJobs.simulation = null;
@@ -1431,9 +1508,10 @@
       const tbody = document.getElementById('resultsBody');
       const filter = document.getElementById('filterInput').value.toLowerCase();
       const rows = state.results.filter(item => item.strategy.toLowerCase().includes(filter));
-      document.getElementById('resultsStatus').textContent = rows.length ? `${rows.length} resultados` : 'Sin resultados';
+      const quality = sanitizationLabel(state.sanitization);
+      document.getElementById('resultsStatus').textContent = rows.length ? `${rows.length} resultados${quality ? ` / ${quality}` : ''}` : 'Sin resultados';
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="24" class="muted">Sin resultados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="27" class="muted">Sin resultados.</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map(item => {
@@ -1463,6 +1541,9 @@
             <td>${money(m.avgSinglePayoutAmount)}</td>
             <td>${money(m.avgPayoutPerAccount)} / ${money(m.medianPayoutPerAccount)}</td>
             <td>${money(m.medianMonthlyReturn)}</td>
+            <td>${Number(m.avgTacticalTrades || 0).toFixed(2)}</td>
+            <td>${Number(m.payoutsUnlockedByTactical || 0)}</td>
+            <td>${Number(m.accountsBlownByTactical || 0)}</td>
             <td>${m.maxPayouts}</td>
             <td class="${m.expectedValue >= 0 ? 'positive' : 'negative'}">${money(m.expectedValue)}</td>
             <td>${m.medianMaxConsecutiveLosses.toFixed(1)}</td>
@@ -1630,7 +1711,7 @@
                 <tr>
                   <td>${trade.index}</td>
                   <td><span class="badge phase">${trade.phase}</span></td>
-                  <td>${escapeHtml(trade.instrument || 'NQ')}</td>
+                  <td>${trade.isSynthetic ? '<span class="badge warn">TACTICAL</span>' : escapeHtml(trade.instrument || 'NQ')}</td>
                   <td>${escapeHtml(trade.closeTime.slice(0, 10))}</td>
                   <td>${trade.netPoints.toFixed(2)}</td>
                   <td>${trade.requestedContracts ?? trade.contracts}/${trade.executedContracts ?? trade.contracts}</td>
@@ -1653,6 +1734,9 @@
     function eventBadge(event) {
       const cls = event.type === 'ACCOUNT_BLOWN' ? 'bad'
         : event.type === 'EVAL_PASSED' || event.type === 'PAYOUT_TAKEN' ? 'good'
+        : event.type === 'TACTICAL_PAYOUT_TRADE_WON' || event.type === 'TACTICAL_PAYOUT_UNLOCKED' ? 'good'
+        : event.type === 'TACTICAL_PAYOUT_TRADE_LOST' ? 'bad'
+        : event.type === 'TACTICAL_PAYOUT_TRADE_SCHEDULED' ? 'warn'
         : event.type === 'CONSISTENCY_BLOCKED' ? 'warn'
         : 'phase';
       return `<span class="badge ${cls}" title="${escapeHtml(event.message)}">${escapeHtml(event.type)}</span>`;
@@ -1666,9 +1750,11 @@
       state.results = [];
       state.simulationId = null;
       state.livePortfolio = null;
+      state.sanitization = null;
       renderResults();
       renderBankrollStrategyOptions();
       renderLivePortfolio();
+      document.getElementById('resultsStatus').textContent = 'Sin resultados';
       document.getElementById('seedBadge').textContent = 'random';
       document.getElementById('runMeta').textContent = 'Ready';
     }
@@ -1699,7 +1785,11 @@
           strategy: strategy || undefined,
           iterations: numberOr(document.getElementById('optimizerIterations').value, 1000),
           randomization: { mode: 'seeded', seed: document.getElementById('optimizerSeed').value || 'optimizer-v1' },
+          sanitization: sanitizationFromControls(),
           commissions: numberOr(document.getElementById('commissions').value, 4),
+          useFundedTacticalPayoutTrade: document.getElementById('tacticalPayoutTrade').checked,
+          tacticalPayoutWinRate: numberOr(document.getElementById('tacticalWinRate').value, 70) / 100,
+          tacticalPayoutRiskReward: numberOr(document.getElementById('tacticalRiskReward').value, 4),
           useSmartScaling: 'both',
           maxCandidates: numberOr(document.getElementById('optimizerMaxCandidates').value, 60),
           evaluation: { instruments: ['NQ', 'MNQ'], contracts: parseRange(document.getElementById('optEvalRange').value) },
@@ -1781,12 +1871,16 @@
           evaluation: phaseRiskFromControls('evalInstrument', 'evalContracts'),
           fundedPrePayout: phaseRiskFromControls('fundedPreInstrument', 'preContracts'),
           fundedPostPayout: phaseRiskFromControls('fundedPostInstrument', 'postContracts'),
-          useSmartScaling: document.getElementById('smartScaling').checked
+          useSmartScaling: document.getElementById('smartScaling').checked,
+          useFundedTacticalPayoutTrade: document.getElementById('tacticalPayoutTrade').checked,
+          tacticalPayoutWinRate: numberOr(document.getElementById('tacticalWinRate').value, 70) / 100,
+          tacticalPayoutRiskReward: numberOr(document.getElementById('tacticalRiskReward').value, 4)
         },
         randomization: {
           mode,
           seed: mode === 'seeded' ? document.getElementById('bankrollSeed').value : undefined
-        }
+        },
+        sanitization: sanitizationFromControls()
       };
 
       setJobControls('bankroll', true);

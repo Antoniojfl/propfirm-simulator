@@ -1,4 +1,4 @@
-import { Instrument, PropFirmProfile, RandomizationConfig, RiskProfile } from '../types';
+import { Instrument, PropFirmProfile, RandomizationConfig, RiskProfile, TradeSanitizationConfig } from '../types';
 import { RawTrade } from '../tradeParser';
 import { MonteCarloResults } from '../monteCarloEngine';
 
@@ -18,8 +18,12 @@ export interface OptimizerRequest {
   strategy?: string;
   iterations?: number;
   randomization?: RandomizationConfig;
+  sanitization?: TradeSanitizationConfig;
   commissions?: number;
   useSmartScaling?: boolean | 'both';
+  useFundedTacticalPayoutTrade?: boolean;
+  tacticalPayoutWinRate?: number;
+  tacticalPayoutRiskReward?: number;
   evaluation?: OptimizerPhaseSearch;
   fundedPrePayout?: OptimizerPhaseSearch;
   fundedPostPayout?: OptimizerPhaseSearch;

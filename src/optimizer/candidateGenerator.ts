@@ -32,7 +32,10 @@ export function generateCandidates(profile: PropFirmProfile, request: OptimizerR
                   postInstrument,
                   postContracts,
                   commissions: request.commissions ?? 4,
-                  useSmartScaling
+                  useSmartScaling,
+                  useFundedTacticalPayoutTrade: Boolean(request.useFundedTacticalPayoutTrade),
+                  tacticalPayoutWinRate: request.tacticalPayoutWinRate ?? 0.7,
+                  tacticalPayoutRiskReward: request.tacticalPayoutRiskReward ?? 4
                 });
                 candidates.push({
                   id: [
@@ -80,6 +83,9 @@ function buildRiskProfile(input: {
   postContracts: number;
   commissions: number;
   useSmartScaling: boolean;
+  useFundedTacticalPayoutTrade: boolean;
+  tacticalPayoutWinRate: number;
+  tacticalPayoutRiskReward: number;
 }): RiskProfile {
   return {
     evaluationContracts: input.evalContracts,
@@ -102,6 +108,9 @@ function buildRiskProfile(input: {
       pointValue: pointValueForInstrument(input.postInstrument)
     },
     commissions: input.commissions,
-    useSmartScaling: input.useSmartScaling
+    useSmartScaling: input.useSmartScaling,
+    useFundedTacticalPayoutTrade: input.useFundedTacticalPayoutTrade,
+    tacticalPayoutWinRate: input.tacticalPayoutWinRate,
+    tacticalPayoutRiskReward: input.tacticalPayoutRiskReward
   };
 }

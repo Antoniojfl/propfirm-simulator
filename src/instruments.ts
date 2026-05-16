@@ -82,7 +82,10 @@ export function normalizeRiskProfile(profile: RiskProfile): RiskProfile {
     evaluationContracts: profile.evaluation?.contracts ?? profile.evaluationContracts ?? 2,
     fundedPrePayoutContracts: profile.fundedPrePayout?.contracts ?? profile.fundedPrePayoutContracts ?? 2,
     fundedPostPayoutContracts: profile.fundedPostPayout?.contracts ?? profile.fundedPostPayoutContracts ?? 1,
-    pointValue: legacyPointValue
+    pointValue: legacyPointValue,
+    useFundedTacticalPayoutTrade: profile.useFundedTacticalPayoutTrade ?? false,
+    tacticalPayoutWinRate: profile.tacticalPayoutWinRate ?? 0.7,
+    tacticalPayoutRiskReward: profile.tacticalPayoutRiskReward ?? 4
   };
 }
 

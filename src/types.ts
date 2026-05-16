@@ -3,6 +3,7 @@ export type SimulationPhase = 'evaluation' | 'funded';
 export type DrawdownMode = 'EOD' | 'INTRADAY' | 'STATIC';
 export type RandomizationMode = 'random' | 'seeded';
 export type Instrument = 'NQ' | 'MNQ' | 'ES' | 'MES';
+export type TradeSanitizationMode = 'raw' | 'fixedOutcome';
 
 export interface ToggleRule {
   enabled: boolean;
@@ -105,11 +106,20 @@ export interface RiskProfile {
   fundedPostPayout?: PhaseRiskConfig;
   commissions: number;
   useSmartScaling: boolean;
+  useFundedTacticalPayoutTrade?: boolean;
+  tacticalPayoutWinRate?: number;
+  tacticalPayoutRiskReward?: number;
 }
 
 export interface RandomizationConfig {
   mode: RandomizationMode;
   seed?: string;
+}
+
+export interface TradeSanitizationConfig {
+  mode: TradeSanitizationMode;
+  maxWinPoints?: number;
+  maxLossPoints?: number;
 }
 
 export type TraceEventType =
@@ -122,7 +132,11 @@ export type TraceEventType =
   | 'CONSISTENCY_BLOCKED'
   | 'SCALING_CHANGED'
   | 'TARGET_REACHED_WAITING_DAYS'
-  | 'PAYOUT_WAITING_DAYS';
+  | 'PAYOUT_WAITING_DAYS'
+  | 'TACTICAL_PAYOUT_TRADE_SCHEDULED'
+  | 'TACTICAL_PAYOUT_TRADE_WON'
+  | 'TACTICAL_PAYOUT_TRADE_LOST'
+  | 'TACTICAL_PAYOUT_UNLOCKED';
 
 export interface TraceEvent {
   type: TraceEventType;
@@ -150,6 +164,11 @@ export interface TraceTrade {
   drawdownLevel: number;
   cycleProfit: number;
   events: TraceEvent[];
+  isSynthetic?: boolean;
+  syntheticType?: 'TACTICAL_PAYOUT';
+  winProbability?: number;
+  rewardAmount?: number;
+  riskAmount?: number;
 }
 
 export interface SimulationTrace {
@@ -193,6 +212,11 @@ export interface AccountMetrics {
   fundedGrossWin: number;
   fundedGrossLoss: number;
   fundedWinningTrades: number;
+  tacticalTrades: number;
+  tacticalWins: number;
+  tacticalPnl: number;
+  payoutsUnlockedByTactical: number;
+  accountsBlownByTactical: number;
 }
 
 export interface SimulationRunResult {
