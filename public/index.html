@@ -472,6 +472,7 @@
         <button class="tab active" id="simTab" onclick="showLeftTab('sim')">Simulacion</button>
         <button class="tab" id="optimizerTab" onclick="showLeftTab('optimizer')">Optimizer</button>
         <button class="tab" id="bankrollTab" onclick="showLeftTab('bankroll')">Bankroll</button>
+        <button class="tab" id="liveSelectionTab" onclick="showLeftTab('liveSelection')">Live Selection</button>
         <button class="tab" id="profileTab" onclick="showLeftTab('profile')">Profile Studio</button>
       </div>
 
@@ -731,6 +732,84 @@
         </div>
       </section>
 
+      <section id="liveSelectionPanel" class="panel hidden">
+        <div class="panel-header">
+          <div class="panel-title">Live Selection</div>
+          <span id="liveSelectionStatus" class="status">OOS 2015-2022</span>
+        </div>
+        <div class="section">
+          <div class="grid">
+            <div class="field full">
+              <label for="liveSelectionFolder">Carpeta</label>
+              <select id="liveSelectionFolder"></select>
+            </div>
+            <div class="field">
+              <label for="liveSelectionIterations">Iteraciones</label>
+              <select id="liveSelectionIterations">
+                <option value="1000">1000</option>
+                <option value="5000">5000</option>
+                <option value="10000">10000</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="liveSelectionSeed">Seed</label>
+              <input id="liveSelectionSeed" value="live-selection-v1">
+            </div>
+            <div class="field">
+              <label for="liveSelectionOosStart">OOS start</label>
+              <input id="liveSelectionOosStart" type="number" value="2015" step="1">
+            </div>
+            <div class="field">
+              <label for="liveSelectionOosEnd">OOS end</label>
+              <input id="liveSelectionOosEnd" type="number" value="2022" step="1">
+            </div>
+            <div class="field">
+              <label for="liveSelectionRecentStart">Recent start</label>
+              <input id="liveSelectionRecentStart" type="number" value="2023" step="1">
+            </div>
+            <div class="field">
+              <label for="liveSelectionRecentEnd">Recent end</label>
+              <input id="liveSelectionRecentEnd" type="number" value="2026" step="1">
+            </div>
+            <div class="field">
+              <label for="liveSelectionPortfolioSize">Portfolio size</label>
+              <input id="liveSelectionPortfolioSize" type="number" value="5" min="1" step="1">
+            </div>
+            <div class="field">
+              <label for="liveSelectionDiversityWeight">Peso diversificacion</label>
+              <input id="liveSelectionDiversityWeight" type="number" value="0.35" min="0" max="1" step="0.05">
+            </div>
+            <div class="field">
+              <label for="liveSelectionMinTotalTrades">Min total trades</label>
+              <input id="liveSelectionMinTotalTrades" type="number" value="500" min="1" step="10">
+            </div>
+            <div class="field">
+              <label for="liveSelectionMinOosTrades">Min OOS trades</label>
+              <input id="liveSelectionMinOosTrades" type="number" value="250" min="1" step="10">
+            </div>
+            <div class="field">
+              <label for="liveSelectionMinTradesYear">Min trades/year</label>
+              <input id="liveSelectionMinTradesYear" type="number" value="30" min="1" step="1">
+            </div>
+            <div class="field">
+              <label for="liveSelectionMinPassingYears">Min passing years</label>
+              <input id="liveSelectionMinPassingYears" type="number" value="5" min="1" step="1">
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top: 1rem;">
+            <button id="liveSelectionBtn" onclick="runLiveSelection()">Generar seleccion live</button>
+            <button id="cancelLiveSelectionBtn" class="danger hidden" onclick="cancelCurrentJob('liveSelection')">Cancelar</button>
+          </div>
+          <div id="liveSelectionProgressBox" class="progress-box">
+            <div class="progress-head">
+              <span id="liveSelectionProgressMessage">Preparando...</span>
+              <strong id="liveSelectionProgressPercent">0%</strong>
+            </div>
+            <div class="progress-track"><div id="liveSelectionProgressFill" class="progress-fill"></div></div>
+          </div>
+        </div>
+      </section>
+
       <section id="profilePanel" class="panel hidden">
         <div class="panel-header">
           <div class="panel-title">Profile Studio</div>
@@ -888,6 +967,82 @@
 
       <section class="panel" style="margin-top: 1rem;">
         <div class="panel-header">
+          <div>
+            <div class="panel-title">Live Selection</div>
+            <div class="status">Seleccion formal con OOS 2015-2022, matriz anual y EV por tiempo.</div>
+          </div>
+          <span id="liveSelectionResultStatus" class="status">Sin seleccion live</span>
+        </div>
+        <div class="section">
+          <div id="liveSelectionMetrics" class="metric-grid"></div>
+          <div class="panel-title" style="margin: 1rem 0 0.5rem;">Portfolio recomendado</div>
+          <div class="results-wrap" style="max-height: 360px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Estrategia</th>
+                  <th>Status</th>
+                  <th>Live Score</th>
+                  <th>EV/day</th>
+                  <th>OOS Pass</th>
+                  <th>OOS Payout</th>
+                  <th>OOS Blow-up</th>
+                  <th>Years P/W/F/LS</th>
+                  <th>Corr</th>
+                  <th>Razones</th>
+                </tr>
+              </thead>
+              <tbody id="liveSelectionPortfolioBody">
+                <tr><td colspan="11" class="muted">Ejecuta Live Selection para ver picks.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel-title" style="margin: 1rem 0 0.5rem;">Rejected / Watchlist</div>
+          <div class="results-wrap" style="max-height: 300px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Estrategia</th>
+                  <th>Status</th>
+                  <th>Score</th>
+                  <th>EV/day</th>
+                  <th>Trades OOS</th>
+                  <th>Years P/W/F/LS</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody id="liveSelectionRejectedBody">
+                <tr><td colspan="7" class="muted">Sin rechazos.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel-title" style="margin: 1rem 0 0.5rem;">Matriz anual OOS</div>
+          <div class="results-wrap" style="max-height: 360px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Estrategia</th>
+                  <th>Año</th>
+                  <th>Trades</th>
+                  <th>Net pts</th>
+                  <th>WR</th>
+                  <th>PF</th>
+                  <th>MCL</th>
+                  <th>Expectancy</th>
+                  <th>Verdict</th>
+                </tr>
+              </thead>
+              <tbody id="liveSelectionMatrixBody">
+                <tr><td colspan="9" class="muted">Sin matriz anual.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top: 1rem;">
+        <div class="panel-header">
           <div class="panel-title">Optimizer Ranking</div>
           <span id="optimizerResultStatus" class="status">Sin optimizacion</span>
         </div>
@@ -980,11 +1135,13 @@
       optimizerResults: [],
       bankrollResults: null,
       livePortfolio: null,
+      liveSelection: null,
       sanitization: null,
       currentJobs: {
         simulation: null,
         optimizer: null,
-        bankroll: null
+        bankroll: null,
+        liveSelection: null
       },
       activeTraceIndex: 0,
       traces: []
@@ -1060,6 +1217,7 @@
       state.folders = await foldersRes.json();
       renderProfileSelect();
       renderFolderSelect();
+      renderLiveSelectionFolderSelect();
       selectProfile(state.profiles[0]?.id);
       toggleSeedInput();
       toggleSanitizationFields();
@@ -1089,6 +1247,16 @@
       }).join('');
     }
 
+    function renderLiveSelectionFolderSelect() {
+      const select = document.getElementById('liveSelectionFolder');
+      const defaultFolder = 'stop 825 2015 cierre 2245';
+      select.innerHTML = state.folders.map(folder => {
+        const label = folder === '/' ? '/strategies' : folder;
+        return `<option value="${escapeHtml(folder)}" ${folder === defaultFolder ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+      }).join('');
+      if (state.folders.includes(defaultFolder)) select.value = defaultFolder;
+    }
+
     function selectProfile(id) {
       if (!id) return;
       state.currentProfileId = id;
@@ -1102,10 +1270,12 @@
       document.getElementById('simPanel').classList.toggle('hidden', tab !== 'sim');
       document.getElementById('optimizerPanel').classList.toggle('hidden', tab !== 'optimizer');
       document.getElementById('bankrollPanel').classList.toggle('hidden', tab !== 'bankroll');
+      document.getElementById('liveSelectionPanel').classList.toggle('hidden', tab !== 'liveSelection');
       document.getElementById('profilePanel').classList.toggle('hidden', tab !== 'profile');
       document.getElementById('simTab').classList.toggle('active', tab === 'sim');
       document.getElementById('optimizerTab').classList.toggle('active', tab === 'optimizer');
       document.getElementById('bankrollTab').classList.toggle('active', tab === 'bankroll');
+      document.getElementById('liveSelectionTab').classList.toggle('active', tab === 'liveSelection');
       document.getElementById('profileTab').classList.toggle('active', tab === 'profile');
     }
 
@@ -1390,7 +1560,8 @@
       const ids = {
         simulation: ['runBtn', 'cancelSimBtn'],
         optimizer: ['optimizeBtn', 'cancelOptimizerBtn'],
-        bankroll: ['bankrollBtn', 'cancelBankrollBtn']
+        bankroll: ['bankrollBtn', 'cancelBankrollBtn'],
+        liveSelection: ['liveSelectionBtn', 'cancelLiveSelectionBtn']
       }[kind];
       const runBtn = document.getElementById(ids[0]);
       const cancelBtn = document.getElementById(ids[1]);
@@ -1643,11 +1814,170 @@
       `;
     }
 
+    async function runLiveSelection() {
+      const profileId = document.getElementById('profileSelect').value;
+      const payload = {
+        profileId,
+        folder: document.getElementById('liveSelectionFolder').value || 'stop 825 2015 cierre 2245',
+        riskConfig: {
+          commissions: numberOr(document.getElementById('commissions').value, 0),
+          evaluationContracts: numberOr(document.getElementById('evalContracts').value, 0),
+          fundedPrePayoutContracts: numberOr(document.getElementById('preContracts').value, 0),
+          fundedPostPayoutContracts: numberOr(document.getElementById('postContracts').value, 0),
+          evaluation: phaseRiskFromControls('evalInstrument', 'evalContracts'),
+          fundedPrePayout: phaseRiskFromControls('fundedPreInstrument', 'preContracts'),
+          fundedPostPayout: phaseRiskFromControls('fundedPostInstrument', 'postContracts'),
+          useSmartScaling: document.getElementById('smartScaling').checked,
+          useFundedTacticalPayoutTrade: document.getElementById('tacticalPayoutTrade').checked,
+          tacticalPayoutWinRate: numberOr(document.getElementById('tacticalWinRate').value, 70) / 100,
+          tacticalPayoutRiskReward: numberOr(document.getElementById('tacticalRiskReward').value, 4)
+        },
+        randomization: {
+          mode: 'seeded',
+          seed: document.getElementById('liveSelectionSeed').value || 'live-selection-v1'
+        },
+        sanitization: sanitizationFromControls(),
+        config: {
+          iterations: numberOr(document.getElementById('liveSelectionIterations').value, 1000),
+          oosRange: {
+            start: numberOr(document.getElementById('liveSelectionOosStart').value, 2015),
+            end: numberOr(document.getElementById('liveSelectionOosEnd').value, 2022)
+          },
+          recentRange: {
+            start: numberOr(document.getElementById('liveSelectionRecentStart').value, 2023),
+            end: numberOr(document.getElementById('liveSelectionRecentEnd').value, 2026)
+          },
+          portfolioSize: numberOr(document.getElementById('liveSelectionPortfolioSize').value, 5),
+          diversityWeight: numberOr(document.getElementById('liveSelectionDiversityWeight').value, 0.35),
+          minTotalTrades: numberOr(document.getElementById('liveSelectionMinTotalTrades').value, 500),
+          minOosTrades: numberOr(document.getElementById('liveSelectionMinOosTrades').value, 250),
+          minTradesPerYear: numberOr(document.getElementById('liveSelectionMinTradesYear').value, 30),
+          minOosPassingYears: numberOr(document.getElementById('liveSelectionMinPassingYears').value, 5)
+        }
+      };
+
+      setJobControls('liveSelection', true);
+      hideJobProgress('liveSelection');
+      document.getElementById('liveSelectionStatus').textContent = 'Evaluando...';
+      document.getElementById('liveSelectionResultStatus').textContent = 'Procesando...';
+
+      try {
+        const res = await fetch('/api/live-selection/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const start = await res.json();
+        if (!res.ok) throw new Error(start.error || 'Live selection failed');
+        state.currentJobs.liveSelection = start.jobId;
+        const data = await pollJob('liveSelection', start.jobId);
+        state.liveSelection = data.result;
+        document.getElementById('liveSelectionStatus').textContent = `${data.result.summary.analyzed} estrategias`;
+        renderLiveSelection();
+      } catch (error) {
+        document.getElementById('liveSelectionPortfolioBody').innerHTML = `<tr><td colspan="11" class="negative">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById('liveSelectionResultStatus').textContent = 'Error';
+      } finally {
+        state.currentJobs.liveSelection = null;
+        setJobControls('liveSelection', false);
+      }
+    }
+
+    function renderLiveSelection() {
+      const data = state.liveSelection;
+      if (!data) {
+        document.getElementById('liveSelectionResultStatus').textContent = 'Sin seleccion live';
+        return;
+      }
+
+      const s = data.summary;
+      document.getElementById('liveSelectionResultStatus').textContent = `${s.liveCandidates} candidates / ${s.rejected} rejected`;
+      document.getElementById('liveSelectionMetrics').innerHTML = [
+        metric('Analizadas', s.analyzed),
+        metric('Live candidates', s.liveCandidates),
+        metric('Watchlist', s.watchlist),
+        metric('Rejected', s.rejected),
+        metric('Portfolio EV/day', money(s.portfolioMedianEvPerDay))
+      ].join('');
+
+      document.getElementById('liveSelectionPortfolioBody').innerHTML = data.portfolio.length
+        ? data.portfolio.map(row => liveSelectionPortfolioRow(row)).join('')
+        : '<tr><td colspan="11" class="muted">Sin picks live.</td></tr>';
+
+      const rejectedRows = [...(data.watchlist || []), ...(data.rejected || [])].slice(0, 80);
+      document.getElementById('liveSelectionRejectedBody').innerHTML = rejectedRows.length
+        ? rejectedRows.map(row => liveSelectionRejectedRow(row)).join('')
+        : '<tr><td colspan="7" class="muted">Sin rechazos.</td></tr>';
+
+      const matrixRows = [...(data.portfolio || []), ...(data.nearMisses || []).slice(0, 10)]
+        .flatMap(row => (row.yearlyMatrix || []).map(year => ({ strategy: row.strategy, year })));
+      document.getElementById('liveSelectionMatrixBody').innerHTML = matrixRows.length
+        ? matrixRows.map(({ strategy, year }) => `
+          <tr>
+            <td>${escapeHtml(strategy)}</td>
+            <td>${year.year}</td>
+            <td>${year.trades}</td>
+            <td class="${year.netPoints >= 0 ? 'positive' : 'negative'}">${Number(year.netPoints || 0).toFixed(1)}</td>
+            <td>${pct(year.winRatePercent)}</td>
+            <td>${Number(year.profitFactor || 0).toFixed(2)}</td>
+            <td>${year.maxConsecutiveLosses}</td>
+            <td>${Number(year.expectancyPoints || 0).toFixed(2)}</td>
+            <td><span class="badge ${yearVerdictClass(year.verdict)}">${year.verdict}</span></td>
+          </tr>
+        `).join('')
+        : '<tr><td colspan="9" class="muted">Sin matriz anual.</td></tr>';
+    }
+
+    function liveSelectionPortfolioRow(row) {
+      const m = row.oos?.monteCarlo || {};
+      return `
+        <tr onclick="openTraceDrawer('${escapeHtml(encodeURIComponent(row.strategy))}')">
+          <td>${row.rank}</td>
+          <td><strong>${escapeHtml(row.strategy)}</strong></td>
+          <td><span class="badge good">${row.status}</span></td>
+          <td class="${row.adjustedScore >= 0 ? 'positive' : 'negative'}">${scoreText(row.adjustedScore)}</td>
+          <td class="${row.evPerDay >= 0 ? 'positive' : 'negative'}">${money(row.evPerDay)}</td>
+          <td>${pct(m.passRatePercent)}</td>
+          <td>${pct(m.payoutRatePercent)}</td>
+          <td>${pct(m.fundedBlowUpRate)}</td>
+          <td>${row.oosPassYears}/${row.oosWeakYears}/${row.oosFailYears}/${row.oosLowSampleYears}</td>
+          <td>${Number(row.avgCorrelation || 0).toFixed(2)}</td>
+          <td>${(row.reasons || []).map(reason => `<span class="badge phase">${escapeHtml(reason)}</span>`).join(' ')}</td>
+        </tr>
+      `;
+    }
+
+    function liveSelectionRejectedRow(row) {
+      return `
+        <tr>
+          <td>${escapeHtml(row.strategy)}</td>
+          <td><span class="badge ${row.status === 'WATCHLIST' ? 'warn' : 'bad'}">${row.status}</span></td>
+          <td class="${row.liveScore >= 0 ? 'positive' : 'negative'}">${scoreText(row.liveScore)}</td>
+          <td class="${row.evPerDay >= 0 ? 'positive' : 'negative'}">${money(row.evPerDay)}</td>
+          <td>${row.oosTrades}/${row.totalTrades}</td>
+          <td>${row.oosPassYears}/${row.oosWeakYears}/${row.oosFailYears}/${row.oosLowSampleYears}</td>
+          <td>${(row.reasons || []).map(reason => `<span class="badge phase">${escapeHtml(reason)}</span>`).join(' ')}</td>
+        </tr>
+      `;
+    }
+
+    function yearVerdictClass(verdict) {
+      if (verdict === 'PASS') return 'good';
+      if (verdict === 'WEAK' || verdict === 'LOW_SAMPLE') return 'warn';
+      return 'bad';
+    }
+
     async function openTraceDrawer(encodedStrategy) {
       const strategy = decodeURIComponent(encodedStrategy);
       const drawer = document.getElementById('traceDrawer');
       drawer.classList.add('open');
       document.getElementById('traceTitle').textContent = strategy;
+      if (!state.simulationId) {
+        document.getElementById('traceStatus').textContent = 'Primero ejecuta una simulacion base para ver trazas trade a trade.';
+        document.getElementById('traceContent').innerHTML = '<div class="section muted">Live Selection puede elegir estrategias sin una simulacion base activa. Ejecuta Simulacion para inspeccionar 5 trazas.</div>';
+        document.getElementById('traceTabs').innerHTML = '';
+        return;
+      }
       document.getElementById('traceStatus').textContent = 'Cargando trazas...';
       document.getElementById('traceContent').innerHTML = '';
       document.getElementById('traceTabs').innerHTML = '';

@@ -18,6 +18,8 @@ import { DailyPnlPoint } from './live/types';
 import { buildDailyPointSeries } from './live/dailySeries';
 import { buildLivePortfolio } from './live/portfolioSelector';
 import { normalizeSanitizationConfig, sanitizeTrades, TradeSanitizationReport } from './tradeSanitizer';
+import { LiveSelectionEngine } from './liveSelection/liveSelectionEngine';
+import { DEFAULT_LIVE_SELECTION_FOLDER, LiveSelectionRequest } from './liveSelection/types';
 
 interface SimulationResultCache {
   strategy: string;
@@ -50,7 +52,7 @@ const profileStore = new ProfileStore(configDir);
 const sessions = new Map<string, SimulationSession>();
 const jobs = new Map<string, JobRecord>();
 
-type JobType = 'simulation' | 'optimizer' | 'bankroll';
+type JobType = 'simulation' | 'optimizer' | 'bankroll' | 'liveSelection';
 type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 interface JobProgress {
@@ -208,6 +210,17 @@ app.post('/api/bankroll/simulate', async (req, res) => {
   const job = createJob('bankroll');
   res.status(202).json({ jobId: job.id });
   void runBankrollJob(job, body);
+});
+
+app.post('/api/live-selection/run', async (req, res) => {
+  const body = req.body as LiveSelectionRequest;
+  if (!body.profileId) {
+    return res.status(400).json({ error: 'Invalid live selection payload' });
+  }
+
+  const job = createJob('liveSelection');
+  res.status(202).json({ jobId: job.id });
+  void runLiveSelectionJob(job, body);
 });
 
 app.post('/api/live/portfolio', (req, res) => {
@@ -452,6 +465,73 @@ async function runBankrollJob(job: JobRecord, body: BankrollRequest) {
   } catch (error: any) {
     failJob(job, error);
   }
+}
+
+async function runLiveSelectionJob(job: JobRecord, body: LiveSelectionRequest) {
+  try {
+    markJobRunning(job, 'Preparando live selection...');
+    const profile = profileStore.read(body.profileId!);
+    const riskProfile = buildRiskProfile(body.riskConfig);
+    const folder = body.folder || DEFAULT_LIVE_SELECTION_FOLDER;
+    const targetDir = resolveStrategyFolder(folder);
+    const files = fs.readdirSync(targetDir).filter(file => file.endsWith('.csv'));
+
+    if (files.length === 0) {
+      throw new Error('No strategies found in the selected folder');
+    }
+
+    const sanitization = normalizeSanitizationConfig(body.sanitization ?? { mode: 'fixedOutcome' });
+    const strategies = [];
+    updateJobProgress(job, 0, files.length, `Leyendo ${files.length} estrategias live...`);
+
+    for (const [index, strategyFile] of files.entries()) {
+      throwIfCancelled(job);
+      const parsedTrades = await TradeParser.parseSqxCsv(path.join(targetDir, strategyFile));
+      const { trades } = sanitizeTrades(parsedTrades, sanitization);
+      strategies.push({ strategy: strategyFile, trades });
+      updateJobProgress(job, index + 1, files.length, `Preparando ${index + 1}/${files.length}`);
+      await yieldToEventLoop();
+    }
+
+    throwIfCancelled(job);
+    updateJobProgress(job, 0, strategies.length, 'Corriendo matriz OOS y Monte Carlo...');
+    const engine = new LiveSelectionEngine({
+      profile,
+      riskProfile,
+      strategies,
+      randomization: buildRandomization(body.randomization ?? { mode: 'seeded', seed: 'live-selection-v1' }),
+      config: body.config
+    });
+    const result = await engine.runProgressive({
+      onProgress: (current, total, strategy) => {
+        throwIfCancelled(job);
+        updateJobProgress(job, current, total, strategy === 'Completado' ? 'Completado' : `Evaluando ${current + 1}/${total}: ${strategy}`);
+      },
+      yieldToEventLoop
+    });
+    completeJob(job, {
+      folder,
+      sanitization,
+      result: stripLiveSelectionDailySeries(result)
+    });
+  } catch (error: any) {
+    failJob(job, error);
+  }
+}
+
+function stripLiveSelectionDailySeries(result: any) {
+  const stripRow = (row: any) => ({
+    ...row,
+    dailySeries: undefined
+  });
+  return {
+    ...result,
+    portfolio: (result.portfolio || []).map(stripRow),
+    candidates: (result.candidates || []).map(stripRow),
+    watchlist: (result.watchlist || []).map(stripRow),
+    rejected: (result.rejected || []).map(stripRow),
+    nearMisses: (result.nearMisses || []).map(stripRow)
+  };
 }
 
 function createJob(type: JobType): JobRecord {
