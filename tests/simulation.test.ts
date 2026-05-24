@@ -5,6 +5,7 @@ import { SimulationEngine } from '../src/simulationEngine';
 import { ProfileValidationError, ProfileStore } from '../src/profileStore';
 import { PropFirmProfile, RiskProfile } from '../src/types';
 import { RawTrade } from '../src/tradeParser';
+import { normalizeSanitizationConfig } from '../src/tradeSanitizer';
 
 const risk: RiskProfile = {
   evaluationContracts: 1,
@@ -185,6 +186,75 @@ test('uses different point values for evaluation and funded phases', () => {
   assert.equal(fundedTrade?.instrument, 'MNQ');
   assert.equal(fundedTrade?.netPnl, 20);
   assert.equal(fundedTrade?.pointValue, 2);
+});
+
+test('applies fixed TP SL independently for evaluation and funded phases', () => {
+  const profile = baseProfile({
+    evalRules: {
+      maxContracts: 10,
+      profitTarget: { enabled: true, amount: 10 },
+      drawdown: { enabled: true, mode: 'EOD', amount: 1000 },
+      consistency: { enabled: false, maxDailyProfitPercent: 0 },
+      minTradingDays: { enabled: false, days: 0 }
+    }
+  });
+  const phaseRisk: RiskProfile = {
+    evaluation: { instrument: 'MNQ', contracts: 10, pointValue: 2 },
+    fundedPrePayout: { instrument: 'MNQ', contracts: 6, pointValue: 2 },
+    fundedPostPayout: { instrument: 'MNQ', contracts: 6, pointValue: 2 },
+    commissions: 0,
+    useSmartScaling: false
+  };
+  const sanitization = normalizeSanitizationConfig({
+    mode: 'fixedOutcome',
+    evaluation: { maxWinPoints: 82.5, maxLossPoints: 82.5 },
+    funded: { maxWinPoints: 25, maxLossPoints: 50 }
+  });
+  const result = new SimulationEngine(profile, phaseRisk, [trade(0, 6.5), trade(1, 130), trade(2, -17)], 1, true, undefined, sanitization).run();
+
+  assert.equal(result.trace?.trades[0].phase, 'evaluation');
+  assert.equal(result.trace?.trades[0].netPoints, 82.5);
+  assert.equal(result.trace?.trades[0].netPnl, 1650);
+  assert.equal(result.trace?.trades[1].phase, 'funded');
+  assert.equal(result.trace?.trades[1].netPoints, 25);
+  assert.equal(result.trace?.trades[1].netPnl, 300);
+  assert.equal(result.trace?.trades[2].netPoints, -50);
+  assert.equal(result.trace?.trades[2].netPnl, -600);
+});
+
+test('can run evaluation and funded from separate trade samples', () => {
+  const profile = baseProfile({
+    evalRules: {
+      maxContracts: 10,
+      profitTarget: { enabled: true, amount: 1 },
+      drawdown: { enabled: true, mode: 'EOD', amount: 1000 },
+      consistency: { enabled: false, maxDailyProfitPercent: 0 },
+      minTradingDays: { enabled: false, days: 0 }
+    }
+  });
+  const phaseRisk: RiskProfile = {
+    evaluation: { instrument: 'MNQ', contracts: 1, pointValue: 2 },
+    fundedPrePayout: { instrument: 'MNQ', contracts: 1, pointValue: 2 },
+    fundedPostPayout: { instrument: 'MNQ', contracts: 1, pointValue: 2 },
+    commissions: 0,
+    useSmartScaling: false
+  };
+  const result = new SimulationEngine(
+    profile,
+    phaseRisk,
+    [trade(0, 1)],
+    1,
+    true,
+    undefined,
+    undefined,
+    [trade(1, 25)]
+  ).run();
+
+  assert.equal(result.metrics.evalTrades, 1);
+  assert.equal(result.metrics.fundedTrades, 1);
+  assert.equal(result.trace?.trades[0].phase, 'evaluation');
+  assert.equal(result.trace?.trades[1].phase, 'funded');
+  assert.equal(result.trace?.trades[1].netPnl, 50);
 });
 
 test('allows micro contracts up to the mini-equivalent profile limit', () => {

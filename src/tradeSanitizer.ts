@@ -1,5 +1,19 @@
 import { RawTrade } from './tradeParser';
-import { TradeSanitizationConfig } from './types';
+import { SimulationPhase, TradeSanitizationConfig } from './types';
+
+export interface PhaseSanitizationValues {
+  maxWinPoints: number;
+  maxLossPoints: number;
+}
+
+export interface NormalizedTradeSanitizationConfig {
+  mode: 'raw' | 'fixedOutcome';
+  maxWinPoints: number;
+  maxLossPoints: number;
+  evaluation: PhaseSanitizationValues;
+  funded: PhaseSanitizationValues;
+  phaseSpecific: boolean;
+}
 
 export interface TradeSanitizationReport {
   mode: 'raw' | 'fixedOutcome';
@@ -30,23 +44,14 @@ export function sanitizeTrades(trades: RawTrade[], config?: TradeSanitizationCon
   let negativeAdjustedTrades = 0;
 
   const sanitized = trades.map(trade => {
+    const sanitizedTrade = sanitizeTradeForPhase(trade, normalized, 'evaluation');
     const originalPoints = Number(trade.netPoints || 0);
-    const snappedPoints = originalPoints > 0
-      ? normalized.maxWinPoints
-      : originalPoints < 0
-        ? -normalized.maxLossPoints
-        : 0;
-
+    const snappedPoints = sanitizedTrade.netPoints;
     if (snappedPoints === originalPoints) return trade;
     adjustedTrades++;
     if (originalPoints > 0) positiveAdjustedTrades++;
     if (originalPoints < 0) negativeAdjustedTrades++;
-
-    return {
-      ...trade,
-      netPoints: snappedPoints,
-      rawPnl: scaleRawPnl(trade.rawPnl, originalPoints, snappedPoints)
-    };
+    return sanitizedTrade;
   });
 
   return {
@@ -63,16 +68,53 @@ export function sanitizeTrades(trades: RawTrade[], config?: TradeSanitizationCon
   };
 }
 
-export function normalizeSanitizationConfig(config?: TradeSanitizationConfig): Required<TradeSanitizationConfig> {
-  const mode = config?.mode === 'fixedOutcome' ? 'fixedOutcome' : 'raw';
+export function sanitizeTradeForPhase(
+  trade: RawTrade,
+  config: TradeSanitizationConfig | NormalizedTradeSanitizationConfig | undefined,
+  phase: SimulationPhase
+): RawTrade {
+  const normalized = isNormalized(config) ? config : normalizeSanitizationConfig(config);
+  if (normalized.mode !== 'fixedOutcome') return trade;
+
+  const phaseConfig = phase === 'funded' ? normalized.funded : normalized.evaluation;
+  const originalPoints = Number(trade.netPoints || 0);
+  const snappedPoints = originalPoints > 0
+    ? phaseConfig.maxWinPoints
+    : originalPoints < 0
+      ? -phaseConfig.maxLossPoints
+      : 0;
+
+  if (snappedPoints === originalPoints) return trade;
   return {
-    mode,
-    maxWinPoints: Math.max(0, Number(config?.maxWinPoints ?? 82.5)),
-    maxLossPoints: Math.max(0, Number(config?.maxLossPoints ?? 82.5))
+    ...trade,
+    netPoints: snappedPoints,
+    rawPnl: scaleRawPnl(trade.rawPnl, originalPoints, snappedPoints)
   };
 }
 
-function rawReport(totalTrades: number, config: Required<TradeSanitizationConfig>): TradeSanitizationReport {
+export function normalizeSanitizationConfig(config?: TradeSanitizationConfig): NormalizedTradeSanitizationConfig {
+  const mode = config?.mode === 'fixedOutcome' ? 'fixedOutcome' : 'raw';
+  const maxWinPoints = positiveNumber(config?.maxWinPoints, 84);
+  const maxLossPoints = positiveNumber(config?.maxLossPoints, 84);
+  const evaluation = {
+    maxWinPoints: positiveNumber(config?.evaluation?.maxWinPoints, maxWinPoints),
+    maxLossPoints: positiveNumber(config?.evaluation?.maxLossPoints, maxLossPoints)
+  };
+  const funded = {
+    maxWinPoints: positiveNumber(config?.funded?.maxWinPoints, maxWinPoints),
+    maxLossPoints: positiveNumber(config?.funded?.maxLossPoints, maxLossPoints)
+  };
+  return {
+    mode,
+    maxWinPoints,
+    maxLossPoints,
+    evaluation,
+    funded,
+    phaseSpecific: evaluation.maxWinPoints !== funded.maxWinPoints || evaluation.maxLossPoints !== funded.maxLossPoints
+  };
+}
+
+function rawReport(totalTrades: number, config: NormalizedTradeSanitizationConfig): TradeSanitizationReport {
   return {
     mode: config.mode,
     totalTrades,
@@ -82,6 +124,15 @@ function rawReport(totalTrades: number, config: Required<TradeSanitizationConfig
     maxWinPoints: config.maxWinPoints,
     maxLossPoints: config.maxLossPoints
   };
+}
+
+function isNormalized(config: TradeSanitizationConfig | NormalizedTradeSanitizationConfig | undefined): config is NormalizedTradeSanitizationConfig {
+  return Boolean(config && 'evaluation' in config && 'funded' in config && 'phaseSpecific' in config);
+}
+
+function positiveNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 function scaleRawPnl(rawPnl: number, originalPoints: number, snappedPoints: number): number {

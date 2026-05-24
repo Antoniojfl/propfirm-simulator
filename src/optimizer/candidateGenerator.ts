@@ -31,7 +31,7 @@ export function generateCandidates(profile: PropFirmProfile, request: OptimizerR
                   preContracts,
                   postInstrument,
                   postContracts,
-                  commissions: request.commissions ?? 4,
+                  commissions: 0,
                   useSmartScaling,
                   useFundedTacticalPayoutTrade: Boolean(request.useFundedTacticalPayoutTrade),
                   tacticalPayoutWinRate: request.tacticalPayoutWinRate ?? 0.7,

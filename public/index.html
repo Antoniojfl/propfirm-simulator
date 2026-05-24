@@ -282,6 +282,10 @@
       background: rgba(79, 179, 164, 0.07);
     }
 
+    tr.selected-row {
+      background: rgba(79, 179, 164, 0.14);
+    }
+
     .positive { color: var(--success); font-weight: 800; }
     .negative { color: var(--danger); font-weight: 800; }
     .muted { color: var(--muted); }
@@ -472,6 +476,7 @@
         <button class="tab active" id="simTab" onclick="showLeftTab('sim')">Simulacion</button>
         <button class="tab" id="optimizerTab" onclick="showLeftTab('optimizer')">Optimizer</button>
         <button class="tab" id="bankrollTab" onclick="showLeftTab('bankroll')">Bankroll</button>
+        <button class="tab" id="historicalReplayTab" onclick="showLeftTab('historicalReplay')">Historical Replay</button>
         <button class="tab" id="liveSelectionTab" onclick="showLeftTab('liveSelection')">Live Selection</button>
         <button class="tab" id="profileTab" onclick="showLeftTab('profile')">Profile Studio</button>
       </div>
@@ -487,51 +492,38 @@
               <select id="profileSelect"></select>
             </div>
             <div class="field full">
-              <label for="folderSelect">Carpeta</label>
+              <label for="folderSelect">Carpeta Eval</label>
               <select id="folderSelect"></select>
+            </div>
+            <div class="field full">
+              <label for="fundedFolderSelect">Carpeta Funded</label>
+              <select id="fundedFolderSelect"></select>
             </div>
             <div class="field">
               <label for="evalInstrument">Instrumento Eval</label>
               <select id="evalInstrument">
                 <option value="NQ">NQ</option>
-                <option value="MNQ">MNQ</option>
+                <option value="MNQ" selected>MNQ</option>
                 <option value="ES">ES</option>
                 <option value="MES">MES</option>
               </select>
             </div>
             <div class="field">
-              <label for="fundedPreInstrument">Instrumento Funded Pre</label>
-              <select id="fundedPreInstrument">
+              <label for="fundedInstrument">Instrumento Funded</label>
+              <select id="fundedInstrument">
                 <option value="NQ">NQ</option>
-                <option value="MNQ">MNQ</option>
+                <option value="MNQ" selected>MNQ</option>
                 <option value="ES">ES</option>
                 <option value="MES">MES</option>
               </select>
-            </div>
-            <div class="field">
-              <label for="fundedPostInstrument">Instrumento Funded Post</label>
-              <select id="fundedPostInstrument">
-                <option value="NQ">NQ</option>
-                <option value="MNQ">MNQ</option>
-                <option value="ES">ES</option>
-                <option value="MES">MES</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="commissions">Friccion</label>
-              <input id="commissions" type="number" value="4" step="0.5">
             </div>
             <div class="field">
               <label for="evalContracts">Lotes Eval</label>
-              <input id="evalContracts" type="number" value="2" min="0" step="1">
+              <input id="evalContracts" type="number" value="2" min="1" step="1">
             </div>
             <div class="field">
-              <label for="preContracts">Lotes Funded Pre</label>
-              <input id="preContracts" type="number" value="2" min="0" step="1">
-            </div>
-            <div class="field">
-              <label for="postContracts">Lotes Funded Post</label>
-              <input id="postContracts" type="number" value="1" min="0" step="1">
+              <label for="fundedContracts">Lotes Funded</label>
+              <input id="fundedContracts" type="number" value="2" min="1" step="1">
             </div>
             <div class="field">
               <label for="randomMode">Monte Carlo</label>
@@ -551,13 +543,21 @@
                 <option value="fixedOutcome" selected>Fixed Outcome</option>
               </select>
             </div>
-            <div class="field" id="fixedWinField">
-              <label for="fixedMaxWin">TP pts</label>
-              <input id="fixedMaxWin" type="number" value="82.5" min="0" step="0.1">
+            <div class="field" id="fixedEvalWinField">
+              <label for="fixedEvalMaxWin">TP Eval pts</label>
+              <input id="fixedEvalMaxWin" type="number" value="84" min="0" step="0.1">
             </div>
-            <div class="field" id="fixedLossField">
-              <label for="fixedMaxLoss">SL pts</label>
-              <input id="fixedMaxLoss" type="number" value="82.5" min="0" step="0.1">
+            <div class="field" id="fixedEvalLossField">
+              <label for="fixedEvalMaxLoss">SL Eval pts</label>
+              <input id="fixedEvalMaxLoss" type="number" value="84" min="0" step="0.1">
+            </div>
+            <div class="field" id="fixedFundedWinField">
+              <label for="fixedFundedMaxWin">TP Funded pts</label>
+              <input id="fixedFundedMaxWin" type="number" value="84" min="0" step="0.1">
+            </div>
+            <div class="field" id="fixedFundedLossField">
+              <label for="fixedFundedMaxLoss">SL Funded pts</label>
+              <input id="fixedFundedMaxLoss" type="number" value="84" min="0" step="0.1">
             </div>
           </div>
 
@@ -732,6 +732,114 @@
         </div>
       </section>
 
+      <section id="historicalReplayPanel" class="panel hidden">
+        <div class="panel-header">
+          <div class="panel-title">Historical Replay</div>
+          <span id="historicalReplayStatus" class="status">Data original</span>
+        </div>
+        <div class="section">
+          <div class="grid">
+            <div class="field full">
+              <label for="historicalProfileSelect">Prop firm / perfil</label>
+              <select id="historicalProfileSelect"></select>
+            </div>
+            <div class="field full">
+              <label for="historicalReplayFolder">Banco Eval</label>
+              <select id="historicalReplayFolder"></select>
+            </div>
+            <div class="field full">
+              <label for="historicalFundedFolder">Banco Funded</label>
+              <select id="historicalFundedFolder"></select>
+            </div>
+            <div class="field">
+              <label for="historicalInitialBankroll">Bankroll inicial</label>
+              <input id="historicalInitialBankroll" type="number" value="1000" min="0" step="50">
+            </div>
+            <div class="field">
+              <label for="historicalAccountCost">Costo cuenta</label>
+              <input id="historicalAccountCost" type="number" value="98" min="0" step="1">
+            </div>
+            <div class="field">
+              <label for="historicalReinvestmentPercent">Reinversion %</label>
+              <input id="historicalReinvestmentPercent" type="number" value="100" min="0" max="100" step="5">
+            </div>
+            <div class="field">
+              <label for="historicalHorizonDays">Horizonte dias</label>
+              <input id="historicalHorizonDays" type="number" value="0" min="0" step="21">
+            </div>
+            <div class="field">
+              <label for="historicalEvalInstrument">Instrumento Eval</label>
+              <select id="historicalEvalInstrument">
+                <option value="NQ">NQ</option>
+                <option value="MNQ" selected>MNQ</option>
+                <option value="ES">ES</option>
+                <option value="MES">MES</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="historicalFundedInstrument">Instrumento Funded</label>
+              <select id="historicalFundedInstrument">
+                <option value="NQ">NQ</option>
+                <option value="MNQ" selected>MNQ</option>
+                <option value="ES">ES</option>
+                <option value="MES">MES</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="historicalEvalContracts">Lotes Eval</label>
+              <input id="historicalEvalContracts" type="number" value="2" min="0" step="1">
+            </div>
+            <div class="field">
+              <label for="historicalFundedContracts">Lotes Funded</label>
+              <input id="historicalFundedContracts" type="number" value="2" min="0" step="1">
+            </div>
+            <div class="field">
+              <label for="historicalSanitizationMode">Calculo PnL</label>
+              <select id="historicalSanitizationMode" onchange="toggleHistoricalSanitizationFields()">
+                <option value="fixedOutcome" selected>Por signo del CSV</option>
+              </select>
+            </div>
+            <div class="field" id="historicalFixedEvalWinField">
+              <label for="historicalFixedEvalMaxWin">TP Eval pts</label>
+              <input id="historicalFixedEvalMaxWin" type="number" value="84" min="0" step="0.1">
+            </div>
+            <div class="field" id="historicalFixedEvalLossField">
+              <label for="historicalFixedEvalMaxLoss">SL Eval pts</label>
+              <input id="historicalFixedEvalMaxLoss" type="number" value="84" min="0" step="0.1">
+            </div>
+            <div class="field" id="historicalFixedFundedWinField">
+              <label for="historicalFixedFundedMaxWin">TP Funded pts</label>
+              <input id="historicalFixedFundedMaxWin" type="number" value="84" min="0" step="0.1">
+            </div>
+            <div class="field" id="historicalFixedFundedLossField">
+              <label for="historicalFixedFundedMaxLoss">SL Funded pts</label>
+              <input id="historicalFixedFundedMaxLoss" type="number" value="84" min="0" step="0.1">
+            </div>
+            <div class="field full">
+              <label for="historicalReplayStrategy">Estrategias del banco Eval</label>
+              <div id="historicalReplaySelectionStatus" class="status">Sin estrategias cargadas</div>
+              <div id="historicalReplayStrategy" class="strategy-picker"></div>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top: 1rem;">
+            <button class="secondary" onclick="loadHistoricalReplayStrategiesFromFolder()">Recargar banco Eval</button>
+            <button class="secondary" onclick="setHistoricalReplayStrategySelection(true)">Seleccionar todo</button>
+            <button class="secondary" onclick="setHistoricalReplayStrategySelection(false)">Limpiar selección</button>
+          </div>
+          <div class="toolbar" style="margin-top: 1rem;">
+            <button id="historicalReplayBtn" onclick="runHistoricalReplay()">Ejecutar replay</button>
+            <button id="cancelHistoricalReplayBtn" class="danger hidden" onclick="cancelCurrentJob('historicalReplay')">Cancelar</button>
+          </div>
+          <div id="historicalReplayProgressBox" class="progress-box">
+            <div class="progress-head">
+              <span id="historicalReplayProgressMessage">Preparando...</span>
+              <strong id="historicalReplayProgressPercent">0%</strong>
+            </div>
+            <div class="progress-track"><div id="historicalReplayProgressFill" class="progress-fill"></div></div>
+          </div>
+        </div>
+      </section>
+
       <section id="liveSelectionPanel" class="panel hidden">
         <div class="panel-header">
           <div class="panel-title">Live Selection</div>
@@ -864,11 +972,11 @@
           <table>
             <thead>
               <tr>
-                <th title="Nombre del archivo CSV de la estrategia simulada.">Estrategia</th>
+                <th title="CSV usado en evaluacion y, si aplica, CSV usado en funded.">Estrategia Eval/Funded</th>
                 <th title="Senales rapidas del ranking live: pick recomendado, EV alto, estabilidad, blow-up o correlacion alta.">Badges</th>
                 <th title="Score balanceado para seleccionar estrategias live. Combina EV, pass rate, payout rate, supervivencia funded, estabilidad y profundidad de payouts.">Live Score</th>
                 <th title="Win rate promedio: porcentaje de trades ganadores en todas las iteraciones Monte Carlo.">WR</th>
-                <th title="Promedio neto por trade despues de comisiones y friccion configurada.">Net/Trade</th>
+                <th title="Promedio neto por trade sin aplicar friccion ni comisiones.">Net/Trade</th>
                 <th title="Mediana de trades necesarios para pasar evaluacion / mediana de trades hasta quemar la evaluacion.">Eval P/F</th>
                 <th title="Promedio de ganancia por trade ganador en evaluacion / promedio de perdida por trade perdedor en evaluacion.">Eval W/L</th>
                 <th title="Porcentaje de iteraciones en las que la estrategia pasa la fase de evaluacion.">Pass</th>
@@ -889,12 +997,15 @@
                 <th title="Cantidad de cuentas quemadas por trades tacticos.">Tactical Blown</th>
                 <th title="Maximo numero de payouts alcanzado en alguna iteracion Monte Carlo.">Max</th>
                 <th title="Expected Value: payout promedio por evaluacion comprada menos el costo del perfil.">EV</th>
+                <th title="EV dividido entre los dias estimados del ciclo completo: dias promedio hasta pasar evaluacion + vida funded mediana. Ayuda a comparar velocidad de capital.">EV/day</th>
+                <th title="EV/day multiplicado por 30 dias. Sirve para estimar produccion mensual por slot de cuenta activo.">EV/30d</th>
                 <th title="Mediana de la maxima racha de perdidas consecutivas observada por iteracion.">MCL</th>
+                <th title="Dias estimados del ciclo completo usados para EV/day: evaluacion + funded.">Cycle</th>
                 <th title="Mediana de dias de vida de la cuenta funded antes de quemarse, graduarse o terminar la muestra.">Life</th>
               </tr>
             </thead>
             <tbody id="resultsBody">
-              <tr><td colspan="27" class="muted">Ejecuta una simulacion para ver resultados.</td></tr>
+              <tr><td colspan="30" class="muted">Ejecuta una simulacion para ver resultados.</td></tr>
             </tbody>
           </table>
         </div>
@@ -1105,6 +1216,58 @@
           </div>
         </div>
       </section>
+
+      <section class="panel" style="margin-top: 1rem;">
+        <div class="panel-header">
+          <div class="panel-title">Historical Replay</div>
+          <span id="historicalReplayResultStatus" class="status">Sin replay historico</span>
+        </div>
+        <div class="section">
+          <div class="results-wrap" style="max-height: 280px; margin-bottom: 1rem;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Estrategia</th>
+                  <th>Funded</th>
+                  <th>Net profit</th>
+                  <th>ROI</th>
+                  <th>Compradas</th>
+                  <th>Quemadas</th>
+                  <th>Payouts</th>
+                  <th>Cash</th>
+                  <th>Sin data</th>
+                </tr>
+              </thead>
+              <tbody id="historicalReplayRankingBody">
+                <tr><td colspan="9" class="muted">Ejecuta Historical Replay para ver estrategias.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="historicalReplayMetrics" class="metric-grid"></div>
+          <div id="historicalReplayChart" class="chart"></div>
+          <div class="results-wrap" style="max-height: 320px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Dia</th>
+                  <th>Fecha</th>
+                  <th>Evento</th>
+                  <th>Estrategia</th>
+                  <th>Cuenta</th>
+                  <th>Monto</th>
+                  <th>Balance cuenta</th>
+                  <th>DD cuenta</th>
+                  <th>Buffer DD</th>
+                  <th>Cash</th>
+                </tr>
+              </thead>
+              <tbody id="historicalReplayEventsBody">
+                <tr><td colspan="10" class="muted">Ejecuta Historical Replay para ver eventos.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -1134,6 +1297,10 @@
       randomization: null,
       optimizerResults: [],
       bankrollResults: null,
+      historicalReplayResults: null,
+      historicalReplayStrategies: [],
+      historicalReplaySelectedIndex: 0,
+      historicalReplayDetailCache: {},
       livePortfolio: null,
       liveSelection: null,
       sanitization: null,
@@ -1141,6 +1308,7 @@
         simulation: null,
         optimizer: null,
         bankroll: null,
+        historicalReplay: null,
         liveSelection: null
       },
       activeTraceIndex: 0,
@@ -1197,7 +1365,14 @@
       const adjusted = reports.reduce((sum, item) => sum + Number(item.report?.adjustedTrades || 0), 0);
       const total = reports.reduce((sum, item) => sum + Number(item.report?.totalTrades || 0), 0);
       if (config.mode === 'fixedOutcome') {
-        return `Fixed Outcome TP/SL ${config.maxWinPoints}/${config.maxLossPoints} pts: ${adjusted}/${total} trades normalizados`;
+        const evalWin = config.evaluation?.maxWinPoints ?? config.maxWinPoints;
+        const evalLoss = config.evaluation?.maxLossPoints ?? config.maxLossPoints;
+        const fundedWin = config.funded?.maxWinPoints ?? config.maxWinPoints;
+        const fundedLoss = config.funded?.maxLossPoints ?? config.maxLossPoints;
+        const phaseLabel = (evalWin === fundedWin && evalLoss === fundedLoss)
+          ? `TP/SL ${evalWin}/${evalLoss} pts`
+          : `Eval ${evalWin}/${evalLoss} pts · Funded ${fundedWin}/${fundedLoss} pts`;
+        return `Fixed Outcome ${phaseLabel}: ${adjusted}/${total} trades normalizados`;
       }
       return 'Raw trades';
     }
@@ -1218,9 +1393,10 @@
       renderProfileSelect();
       renderFolderSelect();
       renderLiveSelectionFolderSelect();
-      selectProfile(state.profiles[0]?.id);
+      selectProfile(defaultProfileId());
       toggleSeedInput();
       toggleSanitizationFields();
+      toggleHistoricalSanitizationFields();
       document.getElementById('initialBankroll').addEventListener('input', event => {
         const reserve = document.getElementById('operatingReserveTarget');
         if (!reserve.dataset.touched) reserve.value = event.target.value;
@@ -1228,23 +1404,46 @@
       document.getElementById('operatingReserveTarget').addEventListener('input', event => {
         event.target.dataset.touched = 'true';
       });
+      document.getElementById('historicalAccountCost').addEventListener('input', event => {
+        event.target.dataset.touched = 'true';
+      });
+      document.getElementById('historicalReplayFolder').addEventListener('change', () => {
+        state.historicalReplayStrategies = [];
+        void loadHistoricalReplayStrategiesFromFolder();
+      });
+      void loadHistoricalReplayStrategiesFromFolder();
     }
 
     function renderProfileSelect() {
-      const select = document.getElementById('profileSelect');
-      select.innerHTML = state.profiles.map(item => {
+      const options = state.profiles.map(item => {
         const mode = item.profile.evalRules.drawdown.mode;
         return `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} (${mode})</option>`;
       }).join('');
+      const select = document.getElementById('profileSelect');
+      select.innerHTML = options;
       select.onchange = () => selectProfile(select.value);
+      const historicalSelect = document.getElementById('historicalProfileSelect');
+      historicalSelect.innerHTML = options;
+      historicalSelect.onchange = () => selectProfile(historicalSelect.value);
+    }
+
+    function defaultProfileId() {
+      return state.profiles.find(item => item.id === 'lucidflex_50k.json')?.id
+        || state.profiles.find(item => String(item.name || '').toLowerCase().includes('lucidflex'))?.id
+        || state.profiles[0]?.id;
     }
 
     function renderFolderSelect() {
-      const select = document.getElementById('folderSelect');
-      select.innerHTML = state.folders.map(folder => {
+      const render = select => {
+        select.innerHTML = state.folders.map(folder => {
         const label = folder === '/' ? '/strategies' : folder;
         return `<option value="${escapeHtml(folder)}">${escapeHtml(label)}</option>`;
-      }).join('');
+        }).join('');
+      };
+      render(document.getElementById('folderSelect'));
+      render(document.getElementById('fundedFolderSelect'));
+      render(document.getElementById('historicalReplayFolder'));
+      render(document.getElementById('historicalFundedFolder'));
     }
 
     function renderLiveSelectionFolderSelect() {
@@ -1261,8 +1460,13 @@
       if (!id) return;
       state.currentProfileId = id;
       document.getElementById('profileSelect').value = id;
+      document.getElementById('historicalProfileSelect').value = id;
       const item = state.profiles.find(profile => profile.id === id);
       state.currentProfile = structuredClone(item.profile);
+      const historicalAccountCost = document.getElementById('historicalAccountCost');
+      if (historicalAccountCost && !historicalAccountCost.dataset.touched) {
+        historicalAccountCost.value = Number(state.currentProfile.cost || 0).toString();
+      }
       renderProfileEditor();
     }
 
@@ -1270,11 +1474,13 @@
       document.getElementById('simPanel').classList.toggle('hidden', tab !== 'sim');
       document.getElementById('optimizerPanel').classList.toggle('hidden', tab !== 'optimizer');
       document.getElementById('bankrollPanel').classList.toggle('hidden', tab !== 'bankroll');
+      document.getElementById('historicalReplayPanel').classList.toggle('hidden', tab !== 'historicalReplay');
       document.getElementById('liveSelectionPanel').classList.toggle('hidden', tab !== 'liveSelection');
       document.getElementById('profilePanel').classList.toggle('hidden', tab !== 'profile');
       document.getElementById('simTab').classList.toggle('active', tab === 'sim');
       document.getElementById('optimizerTab').classList.toggle('active', tab === 'optimizer');
       document.getElementById('bankrollTab').classList.toggle('active', tab === 'bankroll');
+      document.getElementById('historicalReplayTab').classList.toggle('active', tab === 'historicalReplay');
       document.getElementById('liveSelectionTab').classList.toggle('active', tab === 'liveSelection');
       document.getElementById('profileTab').classList.toggle('active', tab === 'profile');
     }
@@ -1530,16 +1736,45 @@
     function toggleSanitizationFields() {
       const mode = document.getElementById('sanitizationMode').value;
       const fixedOutcome = mode === 'fixedOutcome';
-      document.getElementById('fixedWinField').classList.toggle('hidden', !fixedOutcome);
-      document.getElementById('fixedLossField').classList.toggle('hidden', !fixedOutcome);
+      ['fixedEvalWinField', 'fixedEvalLossField', 'fixedFundedWinField', 'fixedFundedLossField']
+        .forEach(id => document.getElementById(id).classList.toggle('hidden', !fixedOutcome));
+    }
+
+    function toggleHistoricalSanitizationFields() {
+      ['historicalFixedEvalWinField', 'historicalFixedEvalLossField', 'historicalFixedFundedWinField', 'historicalFixedFundedLossField']
+        .forEach(id => document.getElementById(id).classList.remove('hidden'));
     }
 
     function sanitizationFromControls() {
-      const mode = document.getElementById('sanitizationMode').value;
+      return sanitizationFromIds('sanitizationMode', 'fixedEvalMaxWin', 'fixedEvalMaxLoss', 'fixedFundedMaxWin', 'fixedFundedMaxLoss');
+    }
+
+    function historicalSanitizationFromControls() {
+      const config = sanitizationFromIds('historicalSanitizationMode', 'historicalFixedEvalMaxWin', 'historicalFixedEvalMaxLoss', 'historicalFixedFundedMaxWin', 'historicalFixedFundedMaxLoss');
+      return {
+        ...config,
+        mode: 'fixedOutcome'
+      };
+    }
+
+    function sanitizationFromIds(modeId, evalWinId, evalLossId, fundedWinId, fundedLossId) {
+      const mode = document.getElementById(modeId).value;
+      const evalWin = numberOr(document.getElementById(evalWinId).value, 84);
+      const evalLoss = numberOr(document.getElementById(evalLossId).value, 84);
+      const fundedWin = numberOr(document.getElementById(fundedWinId).value, evalWin);
+      const fundedLoss = numberOr(document.getElementById(fundedLossId).value, evalLoss);
       return {
         mode,
-        maxWinPoints: numberOr(document.getElementById('fixedMaxWin').value, 82.5),
-        maxLossPoints: numberOr(document.getElementById('fixedMaxLoss').value, 82.5)
+        maxWinPoints: evalWin,
+        maxLossPoints: evalLoss,
+        evaluation: {
+          maxWinPoints: evalWin,
+          maxLossPoints: evalLoss
+        },
+        funded: {
+          maxWinPoints: fundedWin,
+          maxLossPoints: fundedLoss
+        }
       };
     }
 
@@ -1561,6 +1796,7 @@
         simulation: ['runBtn', 'cancelSimBtn'],
         optimizer: ['optimizeBtn', 'cancelOptimizerBtn'],
         bankroll: ['bankrollBtn', 'cancelBankrollBtn'],
+        historicalReplay: ['historicalReplayBtn', 'cancelHistoricalReplayBtn'],
         liveSelection: ['liveSelectionBtn', 'cancelLiveSelectionBtn']
       }[kind];
       const runBtn = document.getElementById(ids[0]);
@@ -1592,7 +1828,7 @@
     async function pollJob(kind, jobId) {
       while (state.currentJobs[kind] === jobId) {
         const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
-        const job = await res.json();
+        const job = await readJsonResponse(res, `poll ${kind}`);
         if (!res.ok) throw new Error(job.error || 'Job not found');
         setJobProgress(kind, job);
         if (job.status === 'completed') return job.result;
@@ -1601,6 +1837,40 @@
         await new Promise(resolve => setTimeout(resolve, 650));
       }
       throw new Error('Corrida reemplazada por una nueva ejecucion');
+    }
+
+    async function readJsonResponse(res, label = 'request') {
+      const contentType = res.headers.get('content-type') || '';
+      const text = await res.text();
+      if (!contentType.includes('application/json')) {
+        const preview = text.slice(0, 140).replace(/\s+/g, ' ').trim();
+        throw new Error(`Respuesta no JSON en ${label} (${res.status}). ${preview || 'Respuesta vacia.'}`);
+      }
+      try {
+        return JSON.parse(text);
+      } catch (error) {
+        throw new Error(`JSON invalido en ${label}: ${error.message}`);
+      }
+    }
+
+    async function postJsonWithTimeout(url, payload, timeoutMs = 8000) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          throw new Error('El servidor no devolvio el job id a tiempo. Recarga la pagina y vuelve a ejecutar.');
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
     }
 
     async function cancelCurrentJob(kind) {
@@ -1614,18 +1884,18 @@
     async function runSimulation() {
       const profileId = document.getElementById('profileSelect').value;
       const folder = document.getElementById('folderSelect').value;
+      const fundedFolder = document.getElementById('fundedFolderSelect').value;
       const mode = document.getElementById('randomMode').value;
       const payload = {
         profileId,
         folder,
+        fundedFolder,
         riskConfig: {
-          commissions: numberOr(document.getElementById('commissions').value, 0),
+          commissions: 0,
           evaluationContracts: numberOr(document.getElementById('evalContracts').value, 0),
-          fundedPrePayoutContracts: numberOr(document.getElementById('preContracts').value, 0),
-          fundedPostPayoutContracts: numberOr(document.getElementById('postContracts').value, 0),
+          fundedContracts: numberOr(document.getElementById('fundedContracts').value, 0),
           evaluation: phaseRiskFromControls('evalInstrument', 'evalContracts'),
-          fundedPrePayout: phaseRiskFromControls('fundedPreInstrument', 'preContracts'),
-          fundedPostPayout: phaseRiskFromControls('fundedPostInstrument', 'postContracts'),
+          funded: phaseRiskFromControls('fundedInstrument', 'fundedContracts'),
           useSmartScaling: document.getElementById('smartScaling').checked,
           useFundedTacticalPayoutTrade: document.getElementById('tacticalPayoutTrade').checked,
           tacticalPayoutWinRate: numberOr(document.getElementById('tacticalWinRate').value, 70) / 100,
@@ -1640,16 +1910,13 @@
 
       setJobControls('simulation', true);
       hideJobProgress('simulation');
+      setJobProgress('simulation', { progress: { percent: 0, message: 'Creando job de simulacion...' }, status: 'queued' });
       document.getElementById('loading').style.display = 'block';
       document.getElementById('resultsStatus').textContent = 'Procesando...';
 
       try {
-        const res = await fetch('/api/simulate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const start = await res.json();
+        const res = await postJsonWithTimeout('/api/simulate', payload);
+        const start = await readJsonResponse(res, 'crear simulacion');
         if (!res.ok) throw new Error(start.error || 'Simulation failed');
         state.currentJobs.simulation = start.jobId;
         const data = await pollJob('simulation', start.jobId);
@@ -1657,16 +1924,18 @@
         state.randomization = data.randomization;
         state.sanitization = data.sanitization;
         state.livePortfolio = null;
+        state.historicalReplayStrategies = [];
         state.results = data.results.sort((a, b) => b.metrics.expectedValue - a.metrics.expectedValue);
         document.getElementById('seedBadge').textContent = `${data.randomization.mode}: ${data.randomization.seed}`;
         renderSanitizationStatus(data.sanitization);
-        document.getElementById('instrumentBadge').textContent = `Eval ${document.getElementById('evalInstrument').value} / Funded ${document.getElementById('fundedPreInstrument').value}-${document.getElementById('fundedPostInstrument').value}`;
+        document.getElementById('instrumentBadge').textContent = `Eval ${document.getElementById('evalInstrument').value} / Funded ${document.getElementById('fundedInstrument').value}`;
         document.getElementById('runMeta').textContent = `${data.results.length} estrategias`;
         renderResults();
         renderBankrollStrategyOptions();
+        renderHistoricalReplayStrategyOptions();
         renderLivePortfolio();
       } catch (error) {
-        document.getElementById('resultsBody').innerHTML = `<tr><td colspan="27" class="negative">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById('resultsBody').innerHTML = `<tr><td colspan="30" class="negative">${escapeHtml(error.message)}</td></tr>`;
         document.getElementById('resultsStatus').textContent = error.message;
       } finally {
         state.currentJobs.simulation = null;
@@ -1678,11 +1947,11 @@
     function renderResults() {
       const tbody = document.getElementById('resultsBody');
       const filter = document.getElementById('filterInput').value.toLowerCase();
-      const rows = state.results.filter(item => item.strategy.toLowerCase().includes(filter));
+      const rows = state.results.filter(item => `${item.strategy} ${item.fundedStrategy || ''}`.toLowerCase().includes(filter));
       const quality = sanitizationLabel(state.sanitization);
       document.getElementById('resultsStatus').textContent = rows.length ? `${rows.length} resultados${quality ? ` / ${quality}` : ''}` : 'Sin resultados';
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="27" class="muted">Sin resultados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="30" class="muted">Sin resultados.</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map(item => {
@@ -1692,7 +1961,7 @@
         const badges = liveRow?.badges || [];
         return `
           <tr onclick="openTraceDrawer('${escapeHtml(encodeURIComponent(item.strategy))}')">
-            <td><strong>${escapeHtml(item.strategy)}</strong></td>
+            <td><strong>${escapeHtml(item.strategy)}</strong>${item.fundedStrategy && item.fundedStrategy !== item.strategy ? `<div class="muted">Funded: ${escapeHtml(item.fundedStrategy)}</div>` : ''}</td>
             <td><div class="events">${badges.map(badge => `<span class="badge ${badgeClass(badge)}">${escapeHtml(badge)}</span>`).join('')}</div></td>
             <td class="${liveScore >= 0 ? 'positive' : 'negative'}">${scoreText(liveScore)}</td>
             <td>${pct(m.avgWinRate)}</td>
@@ -1717,7 +1986,10 @@
             <td>${Number(m.accountsBlownByTactical || 0)}</td>
             <td>${m.maxPayouts}</td>
             <td class="${m.expectedValue >= 0 ? 'positive' : 'negative'}">${money(m.expectedValue)}</td>
+            <td class="${Number(m.expectedValuePerDay || 0) >= 0 ? 'positive' : 'negative'}">${money(m.expectedValuePerDay || 0)}</td>
+            <td class="${Number(m.expectedValuePer30Days || 0) >= 0 ? 'positive' : 'negative'}">${money(m.expectedValuePer30Days || 0)}</td>
             <td>${m.medianMaxConsecutiveLosses.toFixed(1)}</td>
+            <td>${Number(m.accountCycleDays || (m.avgDaysToPass + m.medianFundedLifespanDays) || 0).toFixed(1)}d</td>
             <td>${m.medianFundedLifespanDays.toFixed(1)}d</td>
           </tr>
         `;
@@ -1733,9 +2005,68 @@
       container.innerHTML = state.results.map((item, index) => `
         <label class="strategy-option">
           <input type="checkbox" class="bankroll-strategy" value="${escapeHtml(item.strategy)}" ${index < 5 ? 'checked' : ''}>
-          <span>${escapeHtml(item.strategy)} <span class="muted">EV ${money(item.metrics.expectedValue)}</span></span>
+          <span>${escapeHtml(item.strategy)}${item.fundedStrategy && item.fundedStrategy !== item.strategy ? ` / ${escapeHtml(item.fundedStrategy)}` : ''} <span class="muted">EV ${money(item.metrics.expectedValue)}</span></span>
         </label>
       `).join('');
+    }
+
+    function renderHistoricalReplayStrategyOptions() {
+      const container = document.getElementById('historicalReplayStrategy');
+      const source = state.historicalReplayStrategies.length
+        ? state.historicalReplayStrategies.map(strategy => ({ strategy, fundedStrategy: null }))
+        : state.results.map(item => ({ strategy: item.strategy, fundedStrategy: item.fundedStrategy }));
+      if (!source.length) {
+        container.innerHTML = '<span class="muted">Carga estrategias desde la carpeta</span>';
+        updateHistoricalReplaySelectionCount();
+        return;
+      }
+      container.innerHTML = source.map((item, index) => `
+        <label class="strategy-option">
+          <input type="checkbox" class="historical-replay-strategy" value="${escapeHtml(item.strategy)}" checked onchange="updateHistoricalReplaySelectionCount()">
+          <span>${escapeHtml(item.strategy)}${item.fundedStrategy && item.fundedStrategy !== item.strategy ? ` / ${escapeHtml(item.fundedStrategy)}` : ''}</span>
+        </label>
+      `).join('');
+      updateHistoricalReplaySelectionCount();
+    }
+
+    function setHistoricalReplayStrategySelection(checked) {
+      document.querySelectorAll('.historical-replay-strategy').forEach(input => {
+        input.checked = checked;
+      });
+      updateHistoricalReplaySelectionCount();
+    }
+
+    function updateHistoricalReplaySelectionCount() {
+      const total = document.querySelectorAll('.historical-replay-strategy').length;
+      const selected = document.querySelectorAll('.historical-replay-strategy:checked').length;
+      const status = document.getElementById('historicalReplaySelectionStatus');
+      if (!status) return;
+      status.textContent = total ? `${selected}/${total} CSVs seleccionados` : 'Sin estrategias cargadas';
+    }
+
+    async function loadHistoricalReplayStrategiesFromFolder() {
+      const folder = document.getElementById('historicalReplayFolder').value;
+      const container = document.getElementById('historicalReplayStrategy');
+      container.innerHTML = '<span class="muted">Cargando estrategias...</span>';
+      document.getElementById('historicalReplaySelectionStatus').textContent = 'Cargando banco Eval...';
+      try {
+        const res = await fetch(`/api/strategies?folder=${encodeURIComponent(folder)}`);
+        const data = await readJsonResponse(res, 'cargar estrategias');
+        if (!res.ok) throw new Error(data.error || 'No se pudieron cargar estrategias.');
+        state.historicalReplayStrategies = data.strategies || [];
+        if (!state.historicalReplayStrategies.length) {
+          container.innerHTML = '<span class="negative">La carpeta seleccionada no tiene CSVs.</span>';
+          updateHistoricalReplaySelectionCount();
+          return;
+        }
+        renderHistoricalReplayStrategyOptions();
+        document.getElementById('historicalReplayStatus').textContent = `${state.historicalReplayStrategies.length} estrategias cargadas`;
+      } catch (error) {
+        state.historicalReplayStrategies = [];
+        container.innerHTML = `<span class="negative">${escapeHtml(error.message)}</span>`;
+        document.getElementById('historicalReplayStatus').textContent = 'Error cargando';
+        updateHistoricalReplaySelectionCount();
+      }
     }
 
     async function runLivePortfolio() {
@@ -1756,7 +2087,7 @@
             diversityWeight: numberOr(document.getElementById('liveDiversityWeight').value, 0.35)
           })
         });
-        const data = await res.json();
+        const data = await readJsonResponse(res, 'ranking live');
         if (!res.ok) throw new Error(data.error || 'Live portfolio failed');
         state.livePortfolio = data;
         renderLivePortfolio();
@@ -1820,13 +2151,11 @@
         profileId,
         folder: document.getElementById('liveSelectionFolder').value || 'stop 825 2015 cierre 2245',
         riskConfig: {
-          commissions: numberOr(document.getElementById('commissions').value, 0),
+          commissions: 0,
           evaluationContracts: numberOr(document.getElementById('evalContracts').value, 0),
-          fundedPrePayoutContracts: numberOr(document.getElementById('preContracts').value, 0),
-          fundedPostPayoutContracts: numberOr(document.getElementById('postContracts').value, 0),
+          fundedContracts: numberOr(document.getElementById('fundedContracts').value, 0),
           evaluation: phaseRiskFromControls('evalInstrument', 'evalContracts'),
-          fundedPrePayout: phaseRiskFromControls('fundedPreInstrument', 'preContracts'),
-          fundedPostPayout: phaseRiskFromControls('fundedPostInstrument', 'postContracts'),
+          funded: phaseRiskFromControls('fundedInstrument', 'fundedContracts'),
           useSmartScaling: document.getElementById('smartScaling').checked,
           useFundedTacticalPayoutTrade: document.getElementById('tacticalPayoutTrade').checked,
           tacticalPayoutWinRate: numberOr(document.getElementById('tacticalWinRate').value, 70) / 100,
@@ -1858,16 +2187,13 @@
 
       setJobControls('liveSelection', true);
       hideJobProgress('liveSelection');
+      setJobProgress('liveSelection', { progress: { percent: 0, message: 'Creando job live selection...' }, status: 'queued' });
       document.getElementById('liveSelectionStatus').textContent = 'Evaluando...';
       document.getElementById('liveSelectionResultStatus').textContent = 'Procesando...';
 
       try {
-        const res = await fetch('/api/live-selection/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const start = await res.json();
+        const res = await postJsonWithTimeout('/api/live-selection/run', payload);
+        const start = await readJsonResponse(res, 'crear live selection');
         if (!res.ok) throw new Error(start.error || 'Live selection failed');
         state.currentJobs.liveSelection = start.jobId;
         const data = await pollJob('liveSelection', start.jobId);
@@ -1982,7 +2308,7 @@
       document.getElementById('traceContent').innerHTML = '';
       document.getElementById('traceTabs').innerHTML = '';
       const res = await fetch(`/api/simulations/${encodeURIComponent(state.simulationId)}/strategies/${encodeURIComponent(strategy)}/traces`);
-      const data = await res.json();
+      const data = await readJsonResponse(res, 'trazas');
       if (!res.ok) {
         document.getElementById('traceStatus').textContent = data.error || 'Error';
         return;
@@ -2083,6 +2409,7 @@
       state.sanitization = null;
       renderResults();
       renderBankrollStrategyOptions();
+      renderHistoricalReplayStrategyOptions();
       renderLivePortfolio();
       document.getElementById('resultsStatus').textContent = 'Sin resultados';
       document.getElementById('seedBadge').textContent = 'random';
@@ -2107,6 +2434,7 @@
       }
       setJobControls('optimizer', true);
       hideJobProgress('optimizer');
+      setJobProgress('optimizer', { progress: { percent: 0, message: 'Creando job optimizer...' }, status: 'queued' });
       document.getElementById('optimizerStatus').textContent = 'Optimizando...';
       try {
         const payload = {
@@ -2116,7 +2444,7 @@
           iterations: numberOr(document.getElementById('optimizerIterations').value, 1000),
           randomization: { mode: 'seeded', seed: document.getElementById('optimizerSeed').value || 'optimizer-v1' },
           sanitization: sanitizationFromControls(),
-          commissions: numberOr(document.getElementById('commissions').value, 4),
+          commissions: 0,
           useFundedTacticalPayoutTrade: document.getElementById('tacticalPayoutTrade').checked,
           tacticalPayoutWinRate: numberOr(document.getElementById('tacticalWinRate').value, 70) / 100,
           tacticalPayoutRiskReward: numberOr(document.getElementById('tacticalRiskReward').value, 4),
@@ -2126,12 +2454,8 @@
           fundedPrePayout: { instruments: ['NQ', 'MNQ'], contracts: parseRange(document.getElementById('optPreRange').value) },
           fundedPostPayout: { instruments: ['NQ', 'MNQ'], contracts: parseRange(document.getElementById('optPostRange').value) }
         };
-        const res = await fetch('/api/optimize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const start = await res.json();
+        const res = await postJsonWithTimeout('/api/optimize', payload);
+        const start = await readJsonResponse(res, 'crear optimizer');
         if (!res.ok) throw new Error(start.error || 'Optimizer failed');
         state.currentJobs.optimizer = start.jobId;
         const data = await pollJob('optimizer', start.jobId);
@@ -2174,6 +2498,200 @@
       }).join('');
     }
 
+    async function runHistoricalReplay() {
+      const selectedStrategies = [...document.querySelectorAll('.historical-replay-strategy:checked')].map(input => input.value);
+      if (!selectedStrategies.length) {
+        document.getElementById('historicalReplayEventsBody').innerHTML = '<tr><td colspan="10" class="negative">Carga estrategias desde la carpeta y selecciona al menos una estrategia.</td></tr>';
+        document.getElementById('historicalReplayRankingBody').innerHTML = '<tr><td colspan="9" class="negative">No hay CSVs seleccionados para correr.</td></tr>';
+        document.getElementById('historicalReplayStatus').textContent = 'Sin estrategias';
+        return;
+      }
+
+      const horizonDays = numberOr(document.getElementById('historicalHorizonDays').value, 0);
+      const payload = {
+        profileId: document.getElementById('historicalProfileSelect').value,
+        folder: document.getElementById('historicalReplayFolder').value,
+        fundedFolder: document.getElementById('historicalFundedFolder').value,
+        strategies: selectedStrategies,
+        initialBankroll: numberOr(document.getElementById('historicalInitialBankroll').value, 0),
+        maxActiveAccounts: 1,
+        accountCost: numberOr(document.getElementById('historicalAccountCost').value, state.currentProfile?.cost || 0),
+        horizonDays: horizonDays > 0 ? horizonDays : undefined,
+        reinvestmentPercent: numberOr(document.getElementById('historicalReinvestmentPercent').value, 100) / 100,
+        riskConfig: {
+          commissions: 0,
+          evaluationContracts: numberOr(document.getElementById('historicalEvalContracts').value, 0),
+          fundedContracts: numberOr(document.getElementById('historicalFundedContracts').value, 0),
+          evaluation: phaseRiskFromControls('historicalEvalInstrument', 'historicalEvalContracts'),
+          funded: phaseRiskFromControls('historicalFundedInstrument', 'historicalFundedContracts'),
+          useSmartScaling: false,
+          useFundedTacticalPayoutTrade: false,
+          tacticalPayoutWinRate: 0.7,
+          tacticalPayoutRiskReward: 4
+        },
+        sanitization: historicalSanitizationFromControls()
+      };
+
+      setJobControls('historicalReplay', true);
+      hideJobProgress('historicalReplay');
+      setJobProgress('historicalReplay', { progress: { percent: 0, message: 'Creando job historical replay...' }, status: 'queued' });
+      document.getElementById('historicalReplayStatus').textContent = `Ejecutando ${selectedStrategies.length} estrategias...`;
+      document.getElementById('historicalReplayRankingBody').innerHTML = `<tr><td colspan="9" class="muted">Creando job para ${selectedStrategies.length} estrategias seleccionadas...</td></tr>`;
+      document.getElementById('historicalReplayEventsBody').innerHTML = '<tr><td colspan="10" class="muted">Esperando resultados...</td></tr>';
+      try {
+        const res = await postJsonWithTimeout('/api/historical-replay/run', payload);
+        const start = await readJsonResponse(res, 'crear historical replay');
+        if (!res.ok) throw new Error(start.error || 'Historical replay failed');
+        state.currentJobs.historicalReplay = start.jobId;
+        const data = await pollJob('historicalReplay', start.jobId);
+        state.historicalReplayResults = data;
+        state.historicalReplayDetailCache = {};
+        state.historicalReplaySelectedIndex = 0;
+        renderHistoricalReplayResults();
+      } catch (error) {
+        document.getElementById('historicalReplayEventsBody').innerHTML = `<tr><td colspan="10" class="negative">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById('historicalReplayStatus').textContent = 'Error';
+      } finally {
+        state.currentJobs.historicalReplay = null;
+        setJobControls('historicalReplay', false);
+      }
+    }
+
+    function renderHistoricalReplayResults() {
+      const data = state.historicalReplayResults;
+      if (!data) return;
+      const results = data.results || [data];
+      state.historicalReplaySelectedIndex = Math.min(state.historicalReplaySelectedIndex || 0, Math.max(0, results.length - 1));
+      document.getElementById('historicalReplayStatus').textContent = `${results.length} estrategias historicas`;
+      document.getElementById('historicalReplayResultStatus').textContent = data.summary
+        ? `${results.length} estrategias / Net ${money(data.summary.totalNetProfit)}`
+        : `Cash ${money(results[0].cashBalance)} / Net ${money(results[0].netProfit)}`;
+      renderHistoricalReplayRanking(results);
+      void renderHistoricalReplayDetail(results[state.historicalReplaySelectedIndex]);
+    }
+
+    function renderHistoricalReplayRanking(results) {
+      const tbody = document.getElementById('historicalReplayRankingBody');
+      if (!results.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="muted">Sin estrategias.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = results.map((row, index) => `
+        <tr class="clickable-row ${index === state.historicalReplaySelectedIndex ? 'selected-row' : ''}" onclick="selectHistoricalReplayResult(${index})">
+          <td>${escapeHtml(row.strategy || '')}</td>
+          <td>${escapeHtml(row.fundedStrategy || '')}</td>
+          <td class="${Number(row.netProfit || 0) >= 0 ? 'positive' : 'negative'}">${money(row.netProfit || 0)}</td>
+          <td>${pct(row.roiPercent || 0)}</td>
+          <td>${Number(row.accountsPurchased || 0).toFixed(0)}</td>
+          <td>${Number(row.accountsBlown || 0).toFixed(0)}</td>
+          <td>${Number(row.payoutsTaken || 0).toFixed(0)} / ${money(row.grossPayouts || 0)}</td>
+          <td>${money(row.cashBalance || 0)}</td>
+          <td>${Number(row.dataExhausted || 0).toFixed(0)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function selectHistoricalReplayResult(index) {
+      const results = state.historicalReplayResults?.results || [state.historicalReplayResults].filter(Boolean);
+      state.historicalReplaySelectedIndex = index;
+      renderHistoricalReplayRanking(results);
+      void renderHistoricalReplayDetail(results[index]);
+    }
+
+    async function renderHistoricalReplayDetail(row) {
+      if (!row) return;
+      try {
+        const data = await loadHistoricalReplayDetail(row);
+        if (!data) return;
+        document.getElementById('historicalReplayMetrics').innerHTML = [
+          metric('Estrategia', escapeHtml(data.strategy || ''), 'Estrategia historica seleccionada para inspeccion.'),
+          metric('Cuentas compradas', Number(data.accountsPurchased).toFixed(0), 'Cantidad total de evaluaciones compradas durante el replay historico.'),
+          metric('Cuentas quemadas', Number(data.accountsBlown).toFixed(0), 'Cantidad total de cuentas que tocaron drawdown y fueron reemplazadas.'),
+          metric('Gasto cuentas', money(data.accountCostTotal), 'Costo total de cuentas compradas: cuentas compradas por costo del perfil.'),
+          metric('Payouts', `${Number(data.payoutsTaken).toFixed(0)} / ${money(data.grossPayouts)}`, 'Cantidad y monto bruto total de payouts logrados.'),
+          metric('Retirado', money(data.withdrawnProfit), 'Parte de los payouts que no se reinvirtio al cash operativo.'),
+          metric('Cash final', money(data.cashBalance), 'Efectivo final dentro del sistema despues de compras y payouts reinvertidos.'),
+          metric('Net profit', money(data.netProfit), 'Cash final mas retirado menos bankroll inicial.'),
+          metric('ROI', pct(data.roiPercent), 'Retorno sobre el bankroll inicial.'),
+          metric('Activas', Number(data.activeAccounts).toFixed(0), 'Cuentas que siguen abiertas al terminar el replay.'),
+          metric('Sin data', Number(data.dataExhausted).toFixed(0), 'Cuentas o estrategias que se quedaron sin trades originales disponibles.')
+        ].join('');
+        renderHistoricalReplayChart(data.dailyCurve || []);
+        renderHistoricalReplayEvents(data.eventTimeline || []);
+      } catch (error) {
+        document.getElementById('historicalReplayEventsBody').innerHTML = `<tr><td colspan="10" class="negative">${escapeHtml(error.message)}</td></tr>`;
+      }
+    }
+
+    async function loadHistoricalReplayDetail(row) {
+      if (row.eventTimeline && row.dailyCurve) return row;
+      const replayId = state.historicalReplayResults?.replayId;
+      if (!replayId || !row.strategy) {
+        document.getElementById('historicalReplayEventsBody').innerHTML = '<tr><td colspan="10" class="negative">No hay detalle disponible para esta estrategia.</td></tr>';
+        return null;
+      }
+      if (state.historicalReplayDetailCache[row.strategy]) {
+        return state.historicalReplayDetailCache[row.strategy];
+      }
+      document.getElementById('historicalReplayMetrics').innerHTML = '';
+      document.getElementById('historicalReplayChart').innerHTML = '<div class="section muted">Cargando detalle...</div>';
+      document.getElementById('historicalReplayEventsBody').innerHTML = '<tr><td colspan="10" class="muted">Cargando historial completo...</td></tr>';
+      const res = await fetch(`/api/historical-replay/${encodeURIComponent(replayId)}/detail?strategy=${encodeURIComponent(row.strategy)}`);
+      const detail = await readJsonResponse(res, 'detalle historical replay');
+      if (!res.ok) throw new Error(detail.error || 'No se pudo cargar el detalle.');
+      state.historicalReplayDetailCache[row.strategy] = detail;
+      return detail;
+    }
+
+    function renderHistoricalReplayChart(curve) {
+      const el = document.getElementById('historicalReplayChart');
+      if (!curve.length) {
+        el.innerHTML = '<div class="section muted">Sin curva.</div>';
+        return;
+      }
+      const width = 900;
+      const height = 240;
+      const values = curve.map(point => Number(point.totalNetWorth ?? point.cashBalance));
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const span = Math.max(1, max - min);
+      const points = curve.map((point, index) => {
+        const x = curve.length === 1 ? 0 : (index / (curve.length - 1)) * width;
+        const y = height - ((Number(point.totalNetWorth ?? point.cashBalance) - min) / span) * (height - 28) - 14;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+      el.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" width="100%" height="240" role="img">
+          <polyline points="${points}" fill="none" stroke="var(--accent)" stroke-width="3" />
+          <text x="${width - 180}" y="24" fill="var(--muted)" font-size="13">Total net worth</text>
+          <text x="12" y="24" fill="var(--muted)" font-size="13">${money(max)}</text>
+          <text x="12" y="${height - 10}" fill="var(--muted)" font-size="13">${money(min)}</text>
+        </svg>
+      `;
+    }
+
+    function renderHistoricalReplayEvents(events) {
+      const tbody = document.getElementById('historicalReplayEventsBody');
+      if (!events.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="muted">Sin eventos.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = events.map(event => `
+        <tr>
+          <td>${event.day}</td>
+          <td>${escapeHtml(event.date || '')}</td>
+          <td><span class="badge ${event.type === 'ACCOUNT_BLOWN' || event.type === 'BANKROLL_DEPLETED' ? 'bad' : event.type === 'PAYOUT_TAKEN' || event.type === 'EVAL_PASSED' ? 'good' : 'phase'}">${escapeHtml(event.type)}</span></td>
+          <td>${escapeHtml(event.strategy || '')}</td>
+          <td>${escapeHtml(event.accountId || '')}</td>
+          <td class="${Number(event.amount || 0) >= 0 ? 'positive' : 'negative'}">${event.amount === undefined ? '' : money(event.amount)}</td>
+          <td>${event.accountBalance === undefined ? '' : money(event.accountBalance)}</td>
+          <td>${event.accountDrawdownLevel === undefined ? '' : money(event.accountDrawdownLevel)}</td>
+          <td class="${event.accountBalance !== undefined && event.accountDrawdownLevel !== undefined && event.accountBalance - event.accountDrawdownLevel <= 250 ? 'negative' : ''}">${event.accountBalance === undefined || event.accountDrawdownLevel === undefined ? '' : money(event.accountBalance - event.accountDrawdownLevel)}</td>
+          <td>${money(event.cashAfter)}</td>
+        </tr>
+      `).join('');
+    }
+
     async function runBankroll() {
       const selectedStrategies = [...document.querySelectorAll('.bankroll-strategy:checked')].map(input => input.value);
       if (!state.results.length || !selectedStrategies.length) {
@@ -2186,6 +2704,7 @@
       const payload = {
         profileId: document.getElementById('profileSelect').value,
         folder: document.getElementById('folderSelect').value,
+        fundedFolder: document.getElementById('fundedFolderSelect').value,
         strategies: selectedStrategies,
         initialBankroll: numberOr(document.getElementById('initialBankroll').value, 0),
         operatingReserveTarget: numberOr(document.getElementById('operatingReserveTarget').value, numberOr(document.getElementById('initialBankroll').value, 0)),
@@ -2194,13 +2713,11 @@
         iterations: numberOr(document.getElementById('bankrollIterations').value, 1000),
         reinvestmentPercent: numberOr(document.getElementById('reinvestmentPercent').value, 100) / 100,
         riskConfig: {
-          commissions: numberOr(document.getElementById('commissions').value, 0),
+          commissions: 0,
           evaluationContracts: numberOr(document.getElementById('evalContracts').value, 0),
-          fundedPrePayoutContracts: numberOr(document.getElementById('preContracts').value, 0),
-          fundedPostPayoutContracts: numberOr(document.getElementById('postContracts').value, 0),
+          fundedContracts: numberOr(document.getElementById('fundedContracts').value, 0),
           evaluation: phaseRiskFromControls('evalInstrument', 'evalContracts'),
-          fundedPrePayout: phaseRiskFromControls('fundedPreInstrument', 'preContracts'),
-          fundedPostPayout: phaseRiskFromControls('fundedPostInstrument', 'postContracts'),
+          funded: phaseRiskFromControls('fundedInstrument', 'fundedContracts'),
           useSmartScaling: document.getElementById('smartScaling').checked,
           useFundedTacticalPayoutTrade: document.getElementById('tacticalPayoutTrade').checked,
           tacticalPayoutWinRate: numberOr(document.getElementById('tacticalWinRate').value, 70) / 100,
@@ -2215,14 +2732,11 @@
 
       setJobControls('bankroll', true);
       hideJobProgress('bankroll');
+      setJobProgress('bankroll', { progress: { percent: 0, message: 'Creando job bankroll...' }, status: 'queued' });
       document.getElementById('bankrollStatus').textContent = 'Simulando...';
       try {
-        const res = await fetch('/api/bankroll/simulate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const start = await res.json();
+        const res = await postJsonWithTimeout('/api/bankroll/simulate', payload);
+        const start = await readJsonResponse(res, 'crear bankroll');
         if (!res.ok) throw new Error(start.error || 'Bankroll simulation failed');
         state.currentJobs.bankroll = start.jobId;
         const data = await pollJob('bankroll', start.jobId);

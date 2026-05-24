@@ -1,6 +1,7 @@
 import { MonteCarloEngine, MonteCarloResults } from '../monteCarloEngine';
 import { PropFirmProfile, RandomizationConfig, RiskProfile } from '../types';
 import { RawTrade } from '../tradeParser';
+import { NormalizedTradeSanitizationConfig } from '../tradeSanitizer';
 import { buildDailyPointSeries } from '../live/dailySeries';
 import {
   DEFAULT_LIVE_SELECTION_CONFIG,
@@ -25,6 +26,7 @@ export interface LiveSelectionEngineInput {
   strategies: LiveSelectionStrategyInput[];
   randomization?: RandomizationConfig;
   config?: Partial<LiveSelectionConfig>;
+  sanitization?: NormalizedTradeSanitizationConfig;
 }
 
 export class LiveSelectionEngine {
@@ -33,6 +35,7 @@ export class LiveSelectionEngine {
   private strategies: LiveSelectionStrategyInput[];
   private randomization: RandomizationConfig;
   private config: LiveSelectionConfig;
+  private sanitization?: NormalizedTradeSanitizationConfig;
 
   constructor(input: LiveSelectionEngineInput) {
     this.profile = input.profile;
@@ -40,6 +43,7 @@ export class LiveSelectionEngine {
     this.strategies = input.strategies;
     this.randomization = input.randomization ?? { mode: 'seeded', seed: 'live-selection-v1' };
     this.config = normalizeLiveSelectionConfig(input.config);
+    this.sanitization = input.sanitization;
   }
 
   run(): LiveSelectionResponse {
@@ -146,7 +150,8 @@ export class LiveSelectionEngine {
       {
         mode: 'seeded',
         seed: `${this.randomization.seed ?? 'live-selection-v1'}:${strategy}:${label}`
-      }
+      },
+      this.sanitization
     ).run();
     return { trades: trades.length, monteCarlo: metrics };
   }

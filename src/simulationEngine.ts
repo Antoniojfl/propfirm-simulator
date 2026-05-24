@@ -15,6 +15,7 @@ import {
 import { RawTrade } from './tradeParser';
 import { contractLimitForRules, getPhaseRiskConfig, maxMiniContractsForRules, normalizeRiskProfile } from './instruments';
 import { createSeededRng, Rng } from './random';
+import { NormalizedTradeSanitizationConfig, sanitizeTradeForPhase } from './tradeSanitizer';
 
 interface PhaseStats {
   trades: number;
@@ -69,9 +70,11 @@ export class SimulationEngine {
   private profile: PropFirmProfile;
   private riskProfile: RiskProfile;
   private rawTrades: RawTrade[];
+  private fundedRawTrades?: RawTrade[];
   private avgTradesPerDay: number;
   private captureTrace: boolean;
   private tacticalRng: Rng;
+  private sanitization?: NormalizedTradeSanitizationConfig;
   private currentTradeIsTactical = false;
   private traceTrades: TraceTrade[] = [];
   private globalTradeIndex = 0;
@@ -82,14 +85,18 @@ export class SimulationEngine {
     rawTrades: RawTrade[],
     avgTradesPerDay: number = 1,
     captureTrace: boolean = false,
-    tacticalRng: Rng = createSeededRng('simulation-tactical-default')
+    tacticalRng: Rng = createSeededRng('simulation-tactical-default'),
+    sanitization?: NormalizedTradeSanitizationConfig,
+    fundedRawTrades?: RawTrade[]
   ) {
     this.profile = profile;
     this.riskProfile = normalizeRiskProfile(riskProfile);
     this.rawTrades = rawTrades;
+    this.fundedRawTrades = fundedRawTrades;
     this.avgTradesPerDay = avgTradesPerDay;
     this.captureTrace = captureTrace;
     this.tacticalRng = tacticalRng;
+    this.sanitization = sanitization;
   }
 
   public runSingleSimulation(): AccountMetrics {
@@ -113,14 +120,16 @@ export class SimulationEngine {
     const daysToPass = evalAccount.phaseStats.trades / this.avgTradesPerDay;
     const fundedAccount = this.createAccount('funded');
     fundedAccount.state = 'FUNDED';
+    const fundedTrades = this.fundedRawTrades ?? this.rawTrades;
+    tradeIndex = this.fundedRawTrades ? 0 : tradeIndex;
 
-    while (tradeIndex < this.rawTrades.length && fundedAccount.state === 'FUNDED') {
+    while (tradeIndex < fundedTrades.length && fundedAccount.state === 'FUNDED') {
       if (fundedAccount.pendingTacticalTrade) {
-        this.processTacticalPayoutTrade(fundedAccount, this.rawTrades[tradeIndex]);
+        this.processTacticalPayoutTrade(fundedAccount, fundedTrades[tradeIndex]);
         tradeIndex++;
         continue;
       }
-      this.processTrade(fundedAccount, this.profile.fundedRules, this.rawTrades[tradeIndex]);
+      this.processTrade(fundedAccount, this.profile.fundedRules, fundedTrades[tradeIndex]);
       tradeIndex++;
     }
 
@@ -174,7 +183,8 @@ export class SimulationEngine {
       return { continuePhase: false };
     }
 
-    const day = rawTrade.closeTime.toISOString().split('T')[0];
+    const trade = sanitizeTradeForPhase(rawTrade, this.sanitization, account.phase);
+    const day = trade.closeTime.toISOString().split('T')[0];
     const events: TraceEvent[] = [];
     const balanceBefore = account.balance;
     const phaseRisk = getPhaseRiskConfig(this.riskProfile, account.phase, account.payoutsTaken);
@@ -182,8 +192,8 @@ export class SimulationEngine {
     const contracts = this.getContracts(account.phase, account.payoutsTaken, account.balance, account);
     account.currentContracts = contracts;
 
-    const grossPnl = rawTrade.netPoints * contracts * phaseRisk.pointValue;
-    const netPnl = grossPnl - (contracts * this.riskProfile.commissions);
+    const grossPnl = trade.netPoints * contracts * phaseRisk.pointValue;
+    const netPnl = grossPnl;
 
     account.balance += netPnl;
     account.currentDay = day;
@@ -197,7 +207,7 @@ export class SimulationEngine {
     if (netPnl > 0) {
       account.phaseStats.grossWin += netPnl;
       account.phaseStats.winningTrades++;
-      account.winningPointSum += rawTrade.netPoints;
+      account.winningPointSum += trade.netPoints;
       account.winningPointTrades++;
       account.currentConsecutiveLosses = 0;
     } else if (netPnl < 0) {
@@ -238,7 +248,7 @@ export class SimulationEngine {
       }
     }
 
-    const traceTrade = this.captureTrace ? this.toTraceTrade(account, rawTrade, {
+    const traceTrade = this.captureTrace ? this.toTraceTrade(account, trade, {
       balanceBefore,
       grossPnl,
       netPnl,
@@ -616,7 +626,7 @@ export class SimulationEngine {
     const remainingProfit = this.profile.account_size + phaseRules.profitTarget.amount - balance;
     if (remainingProfit <= 0) return capped;
     const avgWinPoints = account.winningPointTrades > 0 ? account.winningPointSum / account.winningPointTrades : 7.5;
-    const expectedNetPerContract = (avgWinPoints * phaseRisk.pointValue) - this.riskProfile.commissions;
+    const expectedNetPerContract = avgWinPoints * phaseRisk.pointValue;
     if (expectedNetPerContract <= 0) return capped;
     return Math.max(1, Math.min(capped, Math.ceil(remainingProfit / expectedNetPerContract)));
   }

@@ -1,14 +1,18 @@
+import { NormalizedTradeSanitizationConfig } from '../tradeSanitizer';
 import { PropFirmProfile, RandomizationConfig, RiskProfile, SimulationTrace, TraceEventType, TradeSanitizationConfig } from '../types';
 import { RawTrade } from '../tradeParser';
 
 export interface BankrollStrategyInput {
   strategy: string;
+  fundedStrategy?: string;
   trades: RawTrade[];
+  fundedTrades?: RawTrade[];
 }
 
 export interface BankrollRequest {
   profileId?: string;
   folder?: string;
+  fundedFolder?: string;
   strategies?: string[];
   riskConfig?: unknown;
   initialBankroll: number;
@@ -26,6 +30,7 @@ export interface BankrollEngineInput {
   riskProfile: RiskProfile;
   strategies: BankrollStrategyInput[];
   request: BankrollRequest;
+  sanitization?: NormalizedTradeSanitizationConfig;
 }
 
 export type BankrollEventType =

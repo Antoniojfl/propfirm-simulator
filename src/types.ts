@@ -120,6 +120,14 @@ export interface TradeSanitizationConfig {
   mode: TradeSanitizationMode;
   maxWinPoints?: number;
   maxLossPoints?: number;
+  evaluation?: {
+    maxWinPoints?: number;
+    maxLossPoints?: number;
+  };
+  funded?: {
+    maxWinPoints?: number;
+    maxLossPoints?: number;
+  };
 }
 
 export type TraceEventType =

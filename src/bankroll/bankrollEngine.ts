@@ -18,7 +18,7 @@ export class BankrollEngine {
   }
 
   public run(): BankrollResponse {
-    const iterations = Math.max(1, Number(this.input.request.iterations || 1000));
+    const iterations = this.iterations();
     const horizonDays = Math.max(1, Math.round(Number(this.input.request.horizonMonths || 12) * 21));
     const results: BankrollIterationResult[] = [];
 
@@ -32,7 +32,7 @@ export class BankrollEngine {
   public async runProgressive(options: {
     onProgress?: (current: number, total: number) => void;
   } = {}): Promise<BankrollResponse> {
-    const iterations = Math.max(1, Number(this.input.request.iterations || 1000));
+    const iterations = this.iterations();
     const horizonDays = Math.max(1, Math.round(Number(this.input.request.horizonMonths || 12) * 21));
     const results: BankrollIterationResult[] = [];
 
@@ -184,10 +184,45 @@ export class BankrollEngine {
           accountsBlown++;
           events.push(this.event(day, account, 'ACCOUNT_BLOWN', 'Account blown', undefined, bankroll, withdrawnProfit));
           activeAccounts.splice(index, 1);
+          this.fillSlots({
+            day,
+            activeAccounts,
+            maxActiveAccounts,
+            accountCost,
+            bankrollRef: value => { bankroll = value; },
+            getBankroll: () => bankroll,
+            getWithdrawnProfit: () => withdrawnProfit,
+            events,
+            nextStrategy: () => {
+              const strategy = this.input.strategies[strategyCursor % this.input.strategies.length];
+              strategyCursor++;
+              return strategy;
+            },
+            accountIndex: () => ++accountsPurchased,
+            iteration
+          });
         } else if (account.nextTradeIndex >= account.trace.trades.length && account.trace.status === 'GRADUATED') {
           activeAccounts.splice(index, 1);
         }
       }
+
+      this.fillSlots({
+        day,
+        activeAccounts,
+        maxActiveAccounts,
+        accountCost,
+        bankrollRef: value => { bankroll = value; },
+        getBankroll: () => bankroll,
+        getWithdrawnProfit: () => withdrawnProfit,
+        events,
+        nextStrategy: () => {
+          const strategy = this.input.strategies[strategyCursor % this.input.strategies.length];
+          strategyCursor++;
+          return strategy;
+        },
+        accountIndex: () => ++accountsPurchased,
+        iteration
+      });
 
       peakBankroll = Math.max(peakBankroll, bankroll);
       maxDrawdown = Math.max(maxDrawdown, peakBankroll - bankroll);
@@ -246,7 +281,7 @@ export class BankrollEngine {
     getBankroll: () => number;
     getWithdrawnProfit: () => number;
     events: BankrollEvent[];
-    nextStrategy: () => { strategy: string; trades: any[] };
+    nextStrategy: () => { strategy: string; fundedStrategy?: string; trades: any[]; fundedTrades?: any[] };
     accountIndex: () => number;
     iteration: number;
   }) {
@@ -262,10 +297,12 @@ export class BankrollEngine {
         profile: this.input.profile,
         riskProfile: this.input.riskProfile,
         trades: strategy.trades,
+        fundedTrades: strategy.fundedTrades,
         randomization: {
           mode: this.input.request.randomization?.mode ?? 'random',
           seed: `${this.effectiveSeed}:${input.iteration}:${accountId}:${strategy.strategy}`
-        }
+        },
+        sanitization: this.input.sanitization
       });
       input.activeAccounts.push(lifecycle);
       const withdrawnProfit = input.getWithdrawnProfit();
@@ -281,6 +318,10 @@ export class BankrollEngine {
         totalNetWorthAfter: bankrollAfterPurchase + withdrawnProfit
       });
     }
+  }
+
+  private iterations(): number {
+    return Math.max(1, Number(this.input.request.iterations || 1000));
   }
 
   private extractPayout(trade: TraceTrade): number {

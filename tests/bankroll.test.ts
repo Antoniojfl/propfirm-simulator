@@ -4,6 +4,7 @@ import { BankrollEngine } from '../src/bankroll/bankrollEngine';
 import { BankrollRequest } from '../src/bankroll/types';
 import { PropFirmProfile, RiskProfile } from '../src/types';
 import { RawTrade } from '../src/tradeParser';
+import { normalizeSanitizationConfig } from '../src/tradeSanitizer';
 
 function profile(cost = 10): PropFirmProfile {
   return {
@@ -108,6 +109,29 @@ test('bankroll keeps no more than the configured active account slots', () => {
   assert.equal(maxActive, 2);
 });
 
+test('bankroll replaces blown accounts on the same day the slot is freed', () => {
+  const result = new BankrollEngine({
+    profile: profile(10),
+    riskProfile: risk,
+    strategies: [{ strategy: 'a.csv', trades: [trade(0, -100)] }],
+    request: request({ initialBankroll: 30, maxActiveAccountsPerDay: 1, horizonMonths: 1 })
+  }).run();
+
+  const dayOnePurchases = result.eventSamples.filter(event => event.day === 1 && event.type === 'ACCOUNT_PURCHASED');
+  const dayOneBlownIndex = result.eventSamples.findIndex(event => event.day === 1 && event.type === 'ACCOUNT_BLOWN');
+  const replacement = result.eventSamples[dayOneBlownIndex + 1];
+  const firstCurvePoint = result.representativeCurves[0].curve[0];
+
+  assert.equal(dayOnePurchases.length, 2);
+  assert.ok(dayOneBlownIndex >= 0);
+  assert.equal(replacement.type, 'ACCOUNT_PURCHASED');
+  assert.equal(replacement.day, 1);
+  assert.equal(replacement.amount, -10);
+  assert.equal(firstCurvePoint.accountsPurchased, 2);
+  assert.equal(firstCurvePoint.accountsBlown, 1);
+  assert.equal(firstCurvePoint.activeAccounts, 1);
+});
+
 test('bankroll reinvests only the configured payout percentage', () => {
   const result = new BankrollEngine({
     profile: profile(10),
@@ -119,6 +143,27 @@ test('bankroll reinvests only the configured payout percentage', () => {
   const payout = result.eventSamples.find(event => event.type === 'PAYOUT_TAKEN');
   assert.equal(payout?.amount, 10);
   assert.ok(result.avgWithdrawnProfit >= 10);
+});
+
+test('bankroll applies phase-specific fixed outcomes to funded trades', () => {
+  const result = new BankrollEngine({
+    profile: profile(0),
+    riskProfile: risk,
+    strategies: [{
+      strategy: 'a.csv',
+      trades: [trade(0, 2)],
+      fundedTrades: [trade(1, 100)]
+    }],
+    sanitization: normalizeSanitizationConfig({
+      mode: 'fixedOutcome',
+      evaluation: { maxWinPoints: 2, maxLossPoints: 2 },
+      funded: { maxWinPoints: 1, maxLossPoints: 5 }
+    }),
+    request: request({ initialBankroll: 100, horizonMonths: 1 })
+  }).run();
+
+  const payout = result.eventSamples.find(event => event.type === 'PAYOUT_TAKEN');
+  assert.equal(payout?.amount, 20);
 });
 
 test('bankroll marks ruin and stalled states', () => {

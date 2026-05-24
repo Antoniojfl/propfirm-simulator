@@ -2,6 +2,7 @@ import { MonteCarloEngine } from '../monteCarloEngine';
 import { PropFirmProfile, RandomizationConfig, RiskProfile } from '../types';
 import { RawTrade } from '../tradeParser';
 import { AccountLifecycle } from './types';
+import { NormalizedTradeSanitizationConfig } from '../tradeSanitizer';
 
 export function createAccountLifecycle(input: {
   accountId: string;
@@ -9,9 +10,11 @@ export function createAccountLifecycle(input: {
   profile: PropFirmProfile;
   riskProfile: RiskProfile;
   trades: RawTrade[];
+  fundedTrades?: RawTrade[];
   randomization: RandomizationConfig;
+  sanitization?: NormalizedTradeSanitizationConfig;
 }): AccountLifecycle {
-  const engine = new MonteCarloEngine(input.profile, input.riskProfile, input.trades, 1, input.randomization);
+  const engine = new MonteCarloEngine(input.profile, input.riskProfile, input.trades, 1, input.randomization, input.sanitization, input.fundedTrades);
   const trace = engine.buildTraces(1)[0] ?? {
     id: input.accountId,
     label: input.accountId,

@@ -15,7 +15,7 @@ async function main() {
     fundedPrePayoutContracts: 2,
     fundedPostPayoutContracts: 1,
     pointValue: 20,
-    commissions: 4,
+    commissions: 0,
     useSmartScaling: true
   };
 
